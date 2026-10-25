@@ -9,7 +9,7 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run typecheck && npm run build --workspaces --if-present",
     "test": "vitest run packages apps/bridge/test",
     "typecheck": "tsc -b packages/core/tsconfig.json packages/hsm/tsconfig.json packages/blackboard/tsconfig.json packages/three/tsconfig.json packages/definition/tsconfig.json packages/devtools/tsconfig.json packages/bridge/tsconfig.json && tsc -p packages/blackboard/tsconfig.type-tests.json && tsc -p examples/three-combat/tsconfig.json && tsc -p examples/three-remote/tsconfig.json && tsc -p apps/editor/tsconfig.json",
     "test:e2e": "playwright test"
