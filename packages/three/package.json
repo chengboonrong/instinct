@@ -1,0 +1,30 @@
+{
+  "name": "@instinct/three",
+  "version": "0.1.0",
+  "description": "Three.js NPC integration and bounded AI scheduling for Instinct",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "peerDependencies": {
+    "three": "^0.175.0"
+  },
+  "dependencies": {
+    "@instinct/core": "0.1.0",
+    "@instinct/hsm": "0.1.0",
+    "@instinct/blackboard": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.175.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@instinct/example-combat",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0"
+  },
+  "dependencies": {
+    "three": "^0.175.0",
+    "@instinct/core": "0.1.0",
+    "@instinct/hsm": "0.1.0",
+    "@instinct/blackboard": "0.1.0",
+    "@instinct/three": "0.1.0"
+  },
+  "devDependencies": {
+    "vite": "^6.2.0",
+    "@types/three": "^0.175.0"
+  }
+}
