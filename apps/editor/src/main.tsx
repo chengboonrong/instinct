@@ -1,7 +1,7 @@
 import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import ReactFlow, {
-  Background, Controls, Handle, MiniMap, Position,
+import {
+  ReactFlow, Background, Controls, Handle, MiniMap, Position,
   type Connection, type Edge, type EdgeChange, type Node, type NodeChange, type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
