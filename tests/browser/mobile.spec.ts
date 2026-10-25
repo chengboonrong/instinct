@@ -16,7 +16,7 @@ test('touch controls, WebGL rendering, bounded AI updates and health transitions
   expect(errors).toEqual([]);
 });
 
-test('repeated tab visibility transitions do not crash the demo', async ({page}) => {
+test('synthetic focus/blur events do not crash the demo', async ({page}) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:5174');

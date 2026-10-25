@@ -14,7 +14,7 @@ npx playwright install --with-deps --only-shell chromium webkit
 npm run test:e2e
 ```
 
-The Playwright config uses Desktop Chrome, Desktop Safari (WebKit) and a WebKit project with an iPhone 13 viewport/touch profile. The mobile project runs the dedicated `tests/browser/mobile.spec.ts` file only. The full desktop flow exercises live game → local relay → Studio; the mobile tests exercise the game and its tap-friendly controls. **Behavior Studio itself remains desktop-oriented; its CSS has a minimum width of 860 px.**
+The Playwright config uses Desktop Chrome, Desktop Safari (WebKit) and a WebKit project with an iPhone 13 viewport/touch profile. The focus/blur regression test dispatches synthetic events; it **does not** suspend Safari or reproduce an OS backgrounding lifecycle. The mobile project runs the dedicated `tests/browser/mobile.spec.ts` file only. The full desktop flow exercises live game → local relay → Studio; the mobile tests exercise the game and its tap-friendly controls. **Behavior Studio itself remains desktop-oriented; its CSS has a minimum width of 860 px.**
 
 ## Synthetic CPU benchmark
 
