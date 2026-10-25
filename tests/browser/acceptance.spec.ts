@@ -34,7 +34,7 @@ test('live two-NPC inspection, trace changes, read-only mode and disconnect', as
     await chooser.selectOption('guard-one');
     await expect(studio.locator('main h1')).toHaveText('Market Guard');
     await expect(studio.locator('.debug-memory')).toContainText('health');
-    await expect(studio.locator('.tree-node.trace-running')).toBeVisible();
+    await expect(studio.locator('.tree-node.trace-running').first()).toBeVisible();
     await expect(studio.locator('#newKind')).toBeDisabled();
     await expect(studio.locator('#nodeLabel')).toBeDisabled();
 
@@ -100,6 +100,6 @@ test('local authoring preview still runs when no remote agent is selected', asyn
   await expect(page.locator('main h1')).toHaveText('Enemy decision tree');
   await page.getByRole('button', {name: /Step/}).click();
   await expect(page.locator('.preview-output')).toContainText('running');
-  await expect(page.locator('.tree-node.trace-running')).toBeVisible();
+  await expect(page.locator('.tree-node.trace-running').first()).toBeVisible();
   await expect(page.locator('.debug-history .debug-entry').first()).toBeVisible();
 });
