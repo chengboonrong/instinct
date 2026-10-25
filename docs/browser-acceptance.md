@@ -15,3 +15,7 @@ The suite checks: authenticated game and Studio connections, two NPCs in the ros
 The CI browser job uses a pinned Playwright version and a software-rendered **headless Chromium** image. This verifies a particular Linux browser environment, **not** real iPhone Safari, and does not certify gameplay frame times, networking security, or GPU memory budgets. Failed tests retain screenshots, video and traces for review.
 
 If any check fails, the branch must remain a draft and the failure should be fixed rather than hidden by a test skip. Do not run the development bridge on a public interface.
+
+## WebKit + mobile viewport (PR #11)
+
+This suite also runs Playwright WebKit on Linux as desktop Safari emulation. A separate `webkit-mobile` project applies an iPhone 13 viewport and touch input to the Three.js demo. The demo exposes tap-friendly damage controls and a non-production diagnostics HUD (frame count, approximate FPS, AI updates, dropped simulation time, WebGL texture count, context lost/restored events). **Linux Playwright WebKit is not physical iPhone Safari**, and the HUD is not a certified GPU memory profiler.
