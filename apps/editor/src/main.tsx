@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {
   ReactFlow, Background, Controls, Handle, MiniMap, Position,
@@ -7,21 +7,24 @@ import {
 import '@xyflow/react/dist/style.css';
 import './style.css';
 import {Agent} from '@instinct/core';
+import {BlackboardStore} from '@instinct/blackboard';
+import {TraceRecorder, type TraceSnapshot} from '@instinct/devtools';
 import {
   compileGraph, parseGraph, sampleGraph, serializeGraph, validateGraph,
   NODE_KINDS, type BehaviorGraph, type BehaviorKind, type TreeNode, type BehaviorRegistry,
 } from '@instinct/definition';
 
-type FlowData = {kind: BehaviorKind; label: string; task?: string; root: boolean};
+type FlowData = {kind: BehaviorKind; label: string; task?: string; root: boolean; debugStatus?: string};
 type FlowNode = Node<FlowData, 'behavior'>;
 type Memory = {health: number; hasTarget: boolean; events: string[]};
-const registry: BehaviorRegistry<Memory> = {
+type MemoryStore = BlackboardStore<Memory>;
+const registry: BehaviorRegistry<MemoryStore> = {
   conditions: {
-    lowHealth: ({blackboard}) => blackboard.health < 30,
-    hasTarget: ({blackboard}) => blackboard.hasTarget,
+    lowHealth: ({blackboard}) => blackboard.get('health') < 30,
+    hasTarget: ({blackboard}) => blackboard.get('hasTarget'),
   },
   actions: {
-    retreat: ({blackboard}) => {blackboard.events.push('Retreat to cover'); return 'running';},
+    retreat: ({blackboard}) => {blackboard.get('events').push('Retreat to cover'); return 'running';},
     attack: ({blackboard}) => {blackboard.events.push('Attack target'); return 'running';},
     patrol: ({blackboard}) => {blackboard.events.push('Continue patrol'); return 'running';},
   },
@@ -32,11 +35,12 @@ const availableTasks = (kind: BehaviorKind) => kind === 'condition'
 
 function VisualNode({data, selected}: NodeProps<FlowNode>) {
   return (
-    <div className={['tree-node', 'kind-' + data.kind, selected ? 'selected' : ''].join(' ')}>
+    <div className={['tree-node', 'kind-' + data.kind, selected ? 'selected' : '', data.debugStatus ? 'trace-' + data.debugStatus : ''].join(' ')}>
       {!data.root && <Handle type="target" position={Position.Left}/>}
       <div className="kind-name">{data.root ? 'ROOT · ' : ''}{data.kind}</div>
       <div className="node-label">{data.label}</div>
       {data.task && <div className="task-name">{data.task}</div>}
+      {data.debugStatus && <div className="runtime-status">{data.debugStatus}</div>}
       {!leaf(data.kind) && <Handle type="source" position={Position.Right}/>}
     </div>
   );
@@ -53,15 +57,17 @@ function App() {
   const [hasTarget, setHasTarget] = useState(false);
   const [previewStatus, setPreviewStatus] = useState('Not started');
   const [previewEvents, setPreviewEvents] = useState<string[]>([]);
+  const [trace, setTrace] = useState<TraceSnapshot | null>(null);
+  const [autoPlaying, setAutoPlaying] = useState(false);
   const nonce = useRef(0);
-  const running = useRef<{graph: BehaviorGraph; agent: Agent<Memory>; memory: Memory} | null>(null);
+  const running = useRef<{graph: BehaviorGraph; agent: Agent<MemoryStore>; memory: MemoryStore; recorder: TraceRecorder} | null>(null);
   const validation = useMemo(() => validateGraph(graph), [graph]);
   const selected = graph.nodes.find(node => node.id === selectedId);
   const nodes = useMemo<FlowNode[]>(() => graph.nodes.map(n => ({
     id: n.id, type: 'behavior', position: n.position,
-    data: {kind: n.kind, label: n.label, ...(n.task ? {task: n.task} : {}), root: n.id === graph.rootId},
+    data: {kind: n.kind, label: n.label, ...(n.task ? {task: n.task} : {}), root: n.id === graph.rootId, ...(trace?.nodeStatuses[n.id] ? {debugStatus: trace.nodeStatuses[n.id]} : {})},
     selected: n.id === selectedId,
-  })), [graph, selectedId]);
+  })), [graph, selectedId, trace]);
   const edges = useMemo<Edge[]>(() => graph.nodes.flatMap(n => n.children.map((childId, index) => ({
     id: n.id + ':' + childId, source: n.id, target: childId,
     label: String(index + 1), type: 'smoothstep', animated: false,
@@ -176,39 +182,52 @@ function App() {
       const value = parseGraph(jsonText);
       setGraph(value);
       setSelectedId(value.rootId);
-      running.current?.agent.stop();
-      running.current = null;
-      setPreviewStatus('Not started');
-      setPreviewEvents([]);
+      resetPreview();
       setNotice('Graph imported and validated.');
     } catch (error) {setNotice(error instanceof Error ? error.message : 'Import failed');}
   };
-  const stepPreview = () => {
+  const stepPreview = useCallback(() => {
     try {
       if (!running.current || running.current.graph !== graph) {
         running.current?.agent.stop();
-        const memory: Memory = {health, hasTarget, events: []};
-        running.current = {graph, memory, agent: new Agent(compileGraph(graph, registry), memory)};
+        running.current?.recorder.dispose();
+        const memory = new BlackboardStore<Memory>({health, hasTarget, events: []});
+        const recorder = new TraceRecorder({capacity: 192});
+        const agent = new Agent(compileGraph(graph, registry, {observer: recorder}), memory);
+        recorder.watchBlackboard(memory);
+        running.current = {graph, memory, agent, recorder};
       }
       const preview = running.current;
-      preview.memory.health = health;
-      preview.memory.hasTarget = hasTarget;
-      preview.memory.events.length = 0;
+      preview.recorder.beginTick();
+      preview.memory.set('health', health);
+      preview.memory.set('hasTarget', hasTarget);
+      preview.memory.get('events').length = 0;
       const status = preview.agent.tick(0.05);
       setPreviewStatus(status);
-      setPreviewEvents([...preview.memory.events]);
+      setPreviewEvents([...preview.memory.get('events')]);
+      setTrace(preview.recorder.snapshot());
       setNotice('Tick complete · 50ms simulated AI time');
     } catch (error) {
+      setAutoPlaying(false);
       setPreviewStatus('Error');
       setNotice(error instanceof Error ? error.message : 'Preview failed');
     }
-  };
+  }, [graph, health, hasTarget]);
   const resetPreview = () => {
     running.current?.agent.stop();
+    running.current?.recorder.dispose();
     running.current = null;
+    setAutoPlaying(false);
     setPreviewStatus('Not started');
     setPreviewEvents([]);
+    setTrace(null);
   };
+
+  useEffect(() => {
+    if (!autoPlaying) return;
+    const interval = window.setInterval(stepPreview, 200);
+    return () => window.clearInterval(interval);
+  }, [autoPlaying, stepPreview]);
 
   return (
     <div className="shell">
@@ -271,7 +290,30 @@ function App() {
             <input id="health" type="range" min={0} max={100} value={health} onChange={e => setHealth(Number(e.target.value))}/>
             <label className="check-row"><input type="checkbox" checked={hasTarget} onChange={e => setHasTarget(e.target.checked)}/> Target detected</label>
             <div className="preview-output"><span className="eyebrow">LAST RESULT</span><strong>{previewStatus}</strong>{previewEvents.map((event, i) => <p key={i}>{event}</p>)}</div>
-            <div className="split"><button className="primary" onClick={stepPreview}>▶ Tick 50ms</button><button onClick={resetPreview}>Reset</button></div>
+            <div className="split"><button className="primary" onClick={stepPreview}>▶ Step</button><button onClick={() => setAutoPlaying(active => !active)}>{autoPlaying ? '⏸ Pause' : '▶ Play'}</button><button onClick={resetPreview}>Reset</button></div>
+            <p className="muted tiny">Play advances one 50ms AI tick every 200ms of wall time. Pause freezes the simulation; Step advances exactly once.</p>
+          </div>
+          <div className="section debugger-pane">
+            <span className="eyebrow">LIVE DEBUGGER · LOCAL PREVIEW</span>
+            <h2>Node execution</h2>
+            <p className="muted tiny">Most recent tick: {trace?.tick ?? 0}. Active nodes glow green; failed nodes red; canceled nodes amber.</p>
+            <div className="debug-metrics">
+              <span>{trace?.nodeStatuses ? Object.values(trace.nodeStatuses).filter(v => v === 'running').length : 0} running</span>
+              <span>{trace?.entries.length ?? 0} events retained</span>
+            </div>
+            <span className="eyebrow">BLACKBOARD SNAPSHOT</span>
+            <div className="debug-memory">{trace ? Object.entries(trace.blackboard).map(([key, value]) => (
+              <div key={key}><code>{key}</code><span>{value}</span></div>
+            )) : <p className="muted tiny">Run a tick to inspect memory.</p>}</div>
+            <span className="eyebrow">RECENT EVENTS</span>
+            <div className="debug-history" aria-label="Execution trace">
+              {trace?.entries.slice(-12).reverse().map(event => (
+                <div key={event.sequence} className="debug-entry"><span className="debug-seq">#{event.sequence}</span>
+                  {event.kind === 'node' ? <><strong>{event.nodeId}</strong><span className={'debug-status ' + event.status}>{event.status}</span></> :
+                    <><strong>{event.key}</strong><span>{event.previous} → {event.current}</span></>}
+                </div>
+              )) ?? <p className="muted tiny">No execution events yet.</p>}
+            </div>
           </div>
           <div className="section"><span className="eyebrow">VALIDATION</span>
             {validation.valid ? <p className="good-text">✓ Tree topology and schema are valid.</p> :

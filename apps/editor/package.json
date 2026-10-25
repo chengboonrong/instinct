@@ -10,6 +10,8 @@
   "dependencies": {
     "@instinct/core": "0.1.0",
     "@instinct/definition": "0.1.0",
+    "@instinct/devtools": "0.1.0",
+    "@instinct/blackboard": "0.1.0",
     "@xyflow/react": "^12.12.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

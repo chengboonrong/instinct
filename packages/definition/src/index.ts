@@ -1,4 +1,4 @@
-import {Action, Condition, Inverter, ReactiveSelector, Selector, Sequence, type ActionFn, type ConditionFn, type Node} from '@instinct/core';
+import {Action, Condition, Inverter, ReactiveSelector, Selector, Sequence, type ActionFn, type ConditionFn, type Node, type Status} from '@instinct/core';
 
 export const GRAPH_VERSION = 1 as const;
 export const NODE_KINDS = ['sequence', 'selector', 'reactiveSelector', 'inverter', 'action', 'condition'] as const;
@@ -137,11 +137,24 @@ export interface BehaviorRegistry<B extends object> {
   readonly conditions: Readonly<Record<string, ConditionFn<B>>>;
 }
 
+export interface GraphNodeEvent {
+  readonly nodeId: string;
+  readonly type: 'tick' | 'abort';
+  readonly status?: Status;
+}
+export interface GraphObserver {
+  onNodeEvent(event: GraphNodeEvent): void;
+}
+export interface CompileGraphOptions {
+  /** Opt-in synchronous instrumentation; omit in production for zero tracing callbacks. */
+  readonly observer?: GraphObserver;
+}
+
 /**
  * Instantiate a new stateful tree for EACH agent. A graph can be shared; the
  * returned Node instances cannot be shared between independently ticking NPCs.
  */
-export function compileGraph<B extends object>(graph: unknown, registry: BehaviorRegistry<B>): Node<B> {
+export function compileGraph<B extends object>(graph: unknown, registry: BehaviorRegistry<B>, options: CompileGraphOptions = {}): Node<B> {
   const validation = validateGraph(graph);
   if (!validation.valid) throw new GraphValidationError(validation.issues);
   const data = graph as BehaviorGraph;
@@ -149,6 +162,7 @@ export function compileGraph<B extends object>(graph: unknown, registry: Behavio
   const build = (id: string): Node<B> => {
     const node = byId.get(id)!;
     const children = node.children.map(build);
+    const implementation: Node<B> = (() => {
     switch (node.kind) {
       case 'sequence': return new Sequence(children);
       case 'selector': return new Selector(children);
@@ -167,6 +181,23 @@ export function compileGraph<B extends object>(graph: unknown, registry: Behavio
         return new Condition(value);
       }
     }
+    })();
+    if (!options.observer) return implementation;
+    const observer = options.observer;
+    let running = false;
+    return {
+      tick(context) {
+        const status = implementation.tick(context);
+        running = status === 'running';
+        observer.onNodeEvent({nodeId: id, type: 'tick', status});
+        return status;
+      },
+      reset() {
+        implementation.reset();
+        if (running) observer.onNodeEvent({nodeId: id, type: 'abort'});
+        running = false;
+      },
+    };
   };
   return build(data.rootId);
 }

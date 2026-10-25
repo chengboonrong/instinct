@@ -1,0 +1,24 @@
+{
+  "name": "@instinct/devtools",
+  "version": "0.1.0",
+  "description": "Opt-in behavior-tree and Blackboard runtime tracing for Instinct",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@instinct/core": "0.1.0",
+    "@instinct/definition": "0.1.0",
+    "@instinct/blackboard": "0.1.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}
