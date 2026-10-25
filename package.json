@@ -5,12 +5,13 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "examples/*"
+    "examples/*",
+    "apps/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
-    "typecheck": "tsc -b packages/core/tsconfig.json packages/hsm/tsconfig.json packages/blackboard/tsconfig.json packages/three/tsconfig.json && tsc -p packages/blackboard/tsconfig.type-tests.json && tsc -p examples/three-combat/tsconfig.json"
+    "typecheck": "tsc -b packages/core/tsconfig.json packages/hsm/tsconfig.json packages/blackboard/tsconfig.json packages/three/tsconfig.json packages/definition/tsconfig.json && tsc -p packages/blackboard/tsconfig.type-tests.json && tsc -p examples/three-combat/tsconfig.json && tsc -p apps/editor/tsconfig.json"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

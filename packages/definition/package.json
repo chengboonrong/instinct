@@ -1,0 +1,22 @@
+{
+  "name": "@instinct/definition",
+  "version": "0.1.0",
+  "description": "Portable Behavior Tree graph definitions, validation, JSON serialization and runtime compilation",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@instinct/core": "0.1.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}
