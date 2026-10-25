@@ -1,0 +1,21 @@
+{
+  "name": "@instinct/example-remote",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5174"
+  },
+  "dependencies": {
+    "three": "^0.175.0",
+    "@instinct/core": "0.1.0",
+    "@instinct/definition": "0.1.0",
+    "@instinct/blackboard": "0.1.0",
+    "@instinct/devtools": "0.1.0",
+    "@instinct/three": "0.1.0",
+    "@instinct/bridge": "0.1.0"
+  },
+  "devDependencies": {
+    "vite": "^6.2.0",
+    "@types/three": "^0.175.0"
+  }
+}
