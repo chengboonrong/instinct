@@ -43,8 +43,10 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Build workspace packages for local bridge and Vite
+        run: npm run build
       - name: Install headless Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps --only-shell chromium
       - name: Run real browser acceptance
         run: npm run test:e2e
       - name: Preserve browser traces on failure
