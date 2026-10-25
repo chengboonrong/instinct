@@ -90,6 +90,11 @@ class BaseConnection {
     const socket = new WebSocket(this.url);
     this.socket = socket;
     socket.addEventListener('open', () => {
+      // A canceled connection must never send the session token.
+      if (this.socket !== socket || this.closedByUser) {
+        if (socket.readyState === WebSocket.OPEN) socket.close();
+        return;
+      }
       socketSend(socket, {type: 'hello', role: this.role, token: this.options.token});
     });
     socket.addEventListener('message', event => {
@@ -126,7 +131,14 @@ class BaseConnection {
     this.ready = false;
     const socket = this.socket;
     this.socket = undefined;
-    socket?.close();
+    if (!socket) return;
+    if (socket.readyState === WebSocket.OPEN) socket.close();
+    else if (socket.readyState === WebSocket.CONNECTING) {
+      // Browser WebSocket.close() throws in CONNECTING; close once it opens.
+      socket.addEventListener('open', () => {
+        if (socket.readyState === WebSocket.OPEN) socket.close();
+      }, {once: true});
+    }
   }
   get connected(): boolean { return this.ready; }
   protected send(message: unknown): void {
