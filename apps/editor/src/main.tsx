@@ -25,8 +25,8 @@ const registry: BehaviorRegistry<MemoryStore> = {
   },
   actions: {
     retreat: ({blackboard}) => {blackboard.get('events').push('Retreat to cover'); return 'running';},
-    attack: ({blackboard}) => {blackboard.events.push('Attack target'); return 'running';},
-    patrol: ({blackboard}) => {blackboard.events.push('Continue patrol'); return 'running';},
+    attack: ({blackboard}) => {blackboard.get('events').push('Attack target'); return 'running';},
+    patrol: ({blackboard}) => {blackboard.get('events').push('Continue patrol'); return 'running';},
   },
 };
 const leaf = (kind: BehaviorKind) => kind === 'action' || kind === 'condition';
