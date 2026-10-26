@@ -152,3 +152,93 @@ describe('AgentScheduler', () => {
     expect(() => scheduler.add({update() {}}, {maxAccumulatedSeconds: -1})).toThrow(RangeError);
   });
 });
+
+
+describe('AgentScheduler lifecycle invariants', () => {
+  it('defers registrations made from inside an update until the next scheduler tick', () => {
+    const scheduler = new AgentScheduler();
+    const late = vi.fn();
+    let created = false;
+    scheduler.add({update() {
+      if (!created) {
+        created = true;
+        scheduler.add({update: late}, {hz: 10});
+      }
+    }}, {hz: 10});
+    const first = scheduler.tick(0.1);
+    expect(first.updates).toBe(1);
+    expect(first.agents).toBe(2);
+    expect(late).not.toHaveBeenCalled();
+    expect(scheduler.tick(0.1).updates).toBe(2);
+    expect(late).toHaveBeenCalledOnce();
+  });
+
+  it('immediately stops remaining catch-up steps after self-unregister', () => {
+    const scheduler = new AgentScheduler();
+    const run = vi.fn();
+    let off: () => void = () => {};
+    off = scheduler.add({update() {run(); off();}}, {
+      hz: 10, maxStepsPerFrame: 4, maxAccumulatedSeconds: 1,
+    });
+    const result = scheduler.tick(1);
+    expect(result.updates).toBe(1);
+    expect(result.agents).toBe(0);
+    expect(run).toHaveBeenCalledOnce();
+    expect(scheduler.tick(1).updates).toBe(0);
+  });
+
+  it('skips an agent unregistered by an earlier agent before its turn', () => {
+    const scheduler = new AgentScheduler();
+    const second = vi.fn();
+    let unregisterSecond: () => void = () => {};
+    scheduler.add({update: () => unregisterSecond()}, {hz: 20});
+    unregisterSecond = scheduler.add({update: second}, {hz: 20});
+    expect(scheduler.tick(0.05).updates).toBe(1);
+    expect(second).not.toHaveBeenCalled();
+  });
+
+  it('allows replacement registration while preserving identity-scoped remove callbacks', () => {
+    const scheduler = new AgentScheduler();
+    let calls = 0;
+    let oldRemoval: () => void = () => {};
+    const actor = {update() {
+      calls++;
+      if (calls === 1) {
+        oldRemoval();
+        scheduler.add(actor, {hz: 10});
+      }
+    }};
+    oldRemoval = scheduler.add(actor, {hz: 10, maxStepsPerFrame: 2});
+    expect(scheduler.tick(0.1).updates).toBe(1);
+    oldRemoval(); // Should not remove the new registration.
+    expect(scheduler.size).toBe(1);
+    expect(scheduler.tick(0.1).updates).toBe(1);
+    expect(calls).toBe(2);
+  });
+
+  it('rejects recursive ticks and remains usable after callback errors', () => {
+    const scheduler = new AgentScheduler();
+    let invocations = 0;
+    scheduler.add({update() {
+      invocations++;
+      if (invocations === 1) expect(() => scheduler.tick(0.1)).toThrow('recursively');
+      if (invocations === 2) throw new Error('NPC callback failure');
+    }}, {hz: 10});
+    expect(scheduler.tick(0.1).updates).toBe(1);
+    expect(() => scheduler.tick(0.1)).toThrow('NPC callback failure');
+    expect(scheduler.tick(0.1).updates).toBe(1);
+    expect(invocations).toBe(3);
+  });
+
+  it('registers a crowd and unregisters the exact agent in constant-time identity map', () => {
+    const scheduler = new AgentScheduler();
+    const removals: Array<() => void> = [];
+    for (let index = 0; index < 500; index++) {
+      removals.push(scheduler.add({update() {}}, {hz: index % 5 === 0 ? 5 : 20}));
+    }
+    expect(scheduler.size).toBe(500);
+    expect(scheduler.tick(0.05).updates).toBe(400);
+    for (const remove of removals) remove();
+    expect(scheduler.size).toBe(0);
+  });
+});

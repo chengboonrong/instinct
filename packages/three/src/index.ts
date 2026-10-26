@@ -160,6 +160,8 @@ interface Entry {
   readonly interval: number;
   readonly maxSteps: number;
   readonly maxAccumulated: number;
+  /** Entries registered from another agent's update become eligible next tick. */
+  readonly firstTick: number;
   accumulator: number;
 }
 export interface SchedulerStats {
@@ -169,14 +171,25 @@ export interface SchedulerStats {
 }
 
 /**
- * Fixed-rate scheduler, independent of rendering. Excess catch-up time is
- * discarded to avoid unbounded CPU spikes following browser suspension.
+ * Fixed-rate scheduler independent of rendering.
+ *
+ * - Agent identity checks/registration are O(1), even for large crowds.
+ * - Iteration is deterministic: new agents registered inside an update start
+ *   on the NEXT tick, never midway through the current frame.
+ * - Removing an agent cancels any remaining catch-up steps immediately.
+ * - Re-entrant tick() calls fail explicitly instead of corrupting timing state.
+ * - Excess time after browser tab suspension is dropped, not queued forever.
+ *
+ * update() exceptions propagate to the caller; the scheduler itself remains
+ * usable for subsequent ticks. Unregister an NPC when it is disposed.
  */
 export class AgentScheduler {
-  private readonly entries = new Set<Entry>();
+  private readonly entries = new Map<ScheduledAgent, Entry>();
+  private ticking = false;
+  private tickNumber = 0;
 
   add(agent: ScheduledAgent, options: SchedulingOptions = {}): () => void {
-    if ([...this.entries].some(entry => entry.agent === agent)) {
+    if (this.entries.has(agent)) {
       throw new Error('Agent is already registered with this scheduler');
     }
     const hz = options.hz ?? 15;
@@ -188,34 +201,54 @@ export class AgentScheduler {
     }
     const interval = 1 / hz;
     if (!Number.isFinite(interval) || interval <= 0) throw new RangeError('Unsupported tick frequency');
-    const entry: Entry = {agent, interval, maxSteps, maxAccumulated: Math.max(interval, maxAccumulated), accumulator: 0};
-    this.entries.add(entry);
-    return () => { this.entries.delete(entry); };
+    const entry: Entry = {
+      agent, interval, maxSteps,
+      maxAccumulated: Math.max(interval, maxAccumulated),
+      firstTick: this.tickNumber + (this.ticking ? 1 : 0),
+      accumulator: 0,
+    };
+    this.entries.set(agent, entry);
+    // Old callbacks must not remove a new registration of the same agent.
+    return () => {
+      if (this.entries.get(agent) === entry) this.entries.delete(agent);
+    };
   }
 
   tick(dt: number): SchedulerStats {
     if (!Number.isFinite(dt) || dt < 0) throw new RangeError('dt must be finite and nonnegative');
+    if (this.ticking) throw new Error('AgentScheduler.tick cannot run recursively');
+    this.ticking = true;
+    this.tickNumber++;
     let updates = 0;
     let discardedSeconds = 0;
-    for (const entry of this.entries) {
-      const total = entry.accumulator + dt;
-      entry.accumulator = Math.min(total, entry.maxAccumulated);
-      discardedSeconds += total - entry.accumulator;
-      let steps = 0;
-      while (entry.accumulator + Number.EPSILON >= entry.interval && steps < entry.maxSteps) {
-        entry.accumulator = Math.max(0, entry.accumulator - entry.interval);
-        entry.agent.update(entry.interval);
-        steps++;
-        updates++;
+    try {
+      for (const [agent, entry] of this.entries) {
+        if (entry.firstTick > this.tickNumber || this.entries.get(agent) !== entry) continue;
+        const total = entry.accumulator + dt;
+        entry.accumulator = Math.min(total, entry.maxAccumulated);
+        discardedSeconds += total - entry.accumulator;
+        let steps = 0;
+        while (entry.accumulator + Number.EPSILON >= entry.interval && steps < entry.maxSteps) {
+          // The callback may unregister or replace itself on any update.
+          if (this.entries.get(agent) !== entry) break;
+          entry.accumulator = Math.max(0, entry.accumulator - entry.interval);
+          agent.update(entry.interval);
+          steps++;
+          updates++;
+        }
+        // A canceled agent must not carry its backlog into a future frame.
+        if (this.entries.get(agent) !== entry) continue;
+        if (entry.accumulator + Number.EPSILON >= entry.interval) {
+          const skipped = Math.floor((entry.accumulator + Number.EPSILON) / entry.interval);
+          const lost = skipped * entry.interval;
+          entry.accumulator = Math.max(0, entry.accumulator - lost);
+          discardedSeconds += lost;
+        }
       }
-      if (entry.accumulator + Number.EPSILON >= entry.interval) {
-        const skipped = Math.floor((entry.accumulator + Number.EPSILON) / entry.interval);
-        const lost = skipped * entry.interval;
-        entry.accumulator = Math.max(0, entry.accumulator - lost);
-        discardedSeconds += lost;
-      }
+      return {updates, discardedSeconds, agents: this.entries.size};
+    } finally {
+      this.ticking = false;
     }
-    return {updates, discardedSeconds, agents: this.entries.size};
   }
 
   clear(): void { this.entries.clear(); }
