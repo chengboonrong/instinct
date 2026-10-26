@@ -9,10 +9,10 @@ test('mobile benchmark produces an exportable 50-NPC performance report', async 
   await expect(page.getByRole('heading', {name: /Mobile AI Benchmark/})).toBeVisible();
   await expect(page.locator('#viewport canvas')).toHaveCount(1);
   await page.getByLabel('NPC count').selectOption('50');
-  await page.getByRole('button', {name: 'Start benchmark'}).tap();
+  await page.getByRole('button', {name: 'Start benchmark'}).click();
   await expect(page.locator('#progress')).toContainText('Running 50 NPCs');
   await expect(page.locator('#metrics')).toContainText('recent frame p95:', {timeout: 15000});
-  await page.getByRole('button', {name: 'Stop and generate report'}).tap();
+  await page.getByRole('button', {name: 'Stop and generate report'}).click();
   await expect(page.locator('#progress')).toContainText('Stopped');
   const report = JSON.parse(await page.getByLabel('Benchmark JSON report').inputValue()) as {
     schema: number;
@@ -42,16 +42,16 @@ test('250 NPCs with opt-in tracing remain measurable and reset clears the report
   await page.goto(BENCHMARK);
   await page.getByLabel('NPC count').selectOption('250');
   await page.getByLabel(/Instrument one NPC/).check();
-  await page.getByRole('button', {name: 'Start benchmark'}).tap();
+  await page.getByRole('button', {name: 'Start benchmark'}).click();
   await expect(page.locator('#metrics')).toContainText('recent AI p95:', {timeout: 15000});
-  await page.getByRole('button', {name: 'Stop and generate report'}).tap();
+  await page.getByRole('button', {name: 'Stop and generate report'}).click();
   const report = JSON.parse(await page.getByLabel('Benchmark JSON report').inputValue()) as {
     workload: {npcCount: number; tracedAgents: number};
     metrics: {aiUpdates: number};
   };
   expect(report.workload).toMatchObject({npcCount: 250, tracedAgents: 1});
   expect(report.metrics.aiUpdates).toBeGreaterThan(0);
-  await page.getByRole('button', {name: 'Reset', exact: true}).tap();
+  await page.getByRole('button', {name: 'Reset', exact: true}).click();
   await expect(page.getByLabel('Benchmark JSON report')).toHaveValue('');
   await expect(page.getByRole('button', {name: 'Download JSON'})).toBeDisabled();
   await expect(page.getByRole('button', {name: 'Start benchmark'})).toBeEnabled();
