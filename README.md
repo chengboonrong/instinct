@@ -24,6 +24,10 @@ Engine-independent game AI building blocks (Behavior Trees, hierarchical state m
 - `examples/three-combat` — basic combat NPC
 - `examples/three-remote` — two live traced NPCs, selectable in Studio
 
+## Experimental installable alpha
+
+Run `npm run verify:packages` after building to create seven `.tgz` archives and test them from an isolated npm consumer project. CI uploads the compiled package artifacts for evaluation. See [alpha installation](docs/alpha-installation.md). These modules are **not published to npm**; check package-scope ownership before any release.
+
 ## Development
 
 ```sh
@@ -38,7 +42,7 @@ To run the game/editor integration, see [Local Game Bridge](docs/bridge.md). No 
 
 ## Security and maturity
 
-`@instinct/bridge` is a **local development tool**; never expose its WebSocket relay to the public internet. Debug traces can disclose Blackboard values. Dependencies still require security review (issue #6). Manual browser testing, build reproducibility and mobile performance gates remain outstanding.
+`@instinct/bridge` is a **local development tool**; never expose its WebSocket relay to the public internet. Debug traces can disclose Blackboard values. CI tracks dependency audit issue #6, including a locked dependency install. Automated Chromium/WebKit and package checks are in place, but physical iPhone/iPadOS validation (issue #12) and manual release review remain outstanding.
 
 ## License
 

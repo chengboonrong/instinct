@@ -31,6 +31,15 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Pack and verify installable alpha from isolated npm consumer
+        run: npm run verify:packages
+      - name: Preserve experimental alpha npm archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: instinct-alpha-packages
+          path: artifacts/alpha-tarballs/
+          if-no-files-found: error
+          retention-days: 14
       - name: Build standalone mobile device benchmark site
         run: npm run build:mobile --workspace=@instinct/example-remote
       - name: Preserve static device benchmark site
