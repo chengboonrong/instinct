@@ -1,5 +1,12 @@
 import { Agent } from "laya-ts";
+import * as ort from "onnxruntime-web";
 import * as THREE from "three";
+
+// Single-threaded WASM on all iOS Safari configurations, including non-isolated pages.
+// The ONNX Runtime WASM binaries are copied by scripts/prepare-wasm-assets.mjs.
+ort.env.wasm.numThreads = 1;
+ort.env.wasm.wasmPaths = new URL("/wasm/", location.origin).href;
+
 const byId=id=>document.getElementById(id);
 const log=t=>{byId("status").textContent=t};
 let agent, report, renderer, raf, frames=[];
