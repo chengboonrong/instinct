@@ -4,7 +4,7 @@
 
 ## Install / run
 
-1. From `benchmarks/laya-wasm`, run `npm install`. The `postinstall` script **must successfully patch** installed `laya-ts/dist/providers.js` to force the encoder provider to `["wasm"]`. If it fails, stop; do not benchmark.
+1. From `benchmarks/laya-wasm`, run `npm run bootstrap` to clone/build upstream Laya from pinned commit `b9fe351ce81e2d974bca2bf219c1e4030c0a05ea`, then run `npm install`. The `laya-ts` package is not published to npm as of this CI test; use the local package source. The `postinstall` script **must successfully patch** installed `laya-ts/dist/providers.js` to force the encoder provider to `["wasm"]`. If it fails, stop; do not benchmark.
 2. Export actual model artifacts from upstream Laya (see `laya-ts/scripts/export_onnx.py`). Place `encoder.onnx`, `head.onnx`, `tokenizer.json`, `rl_agent_config.json`, and any external tensor sidecar such as `encoder.onnx.data` under `public/models/laya/`. No weights are committed to Instinct.
 3. Run `npm run dev`. The Vite terminal serves a LAN address. For iPhone Safari, use an **HTTPS** hosting configuration with sufficient large-file delivery support, or an authenticated HTTPS tunnel. Do not expose private development services unintentionally.
 4. Open site on physical iPhone 15 Plus with Safari, and tap **Load & benchmark 100**. Export JSON and CSV. Then run **10-minute soak** and export again.
