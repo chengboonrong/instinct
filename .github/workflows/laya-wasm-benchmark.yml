@@ -20,3 +20,5 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run build
       - run: test -s dist/index.html && test -n "$(find dist/assets -name '*.js' -print -quit)"
+      - name: Verify WASM binaries were published
+        run: test -n "$(find dist/wasm -name '*.wasm' -print -quit)"
