@@ -64,3 +64,22 @@ Tap **Load & benchmark 100**, export JSON and CSV, then run **10-minute soak** a
 ## Benchmark protocol
 
 See [research protocol](../../docs/research/laya-iphone15-plus-wasm-benchmark.md).
+
+## Faster model setup: verified pre-exported split ONNX (WASM baseline)
+
+A third-party [pre-exported multilingual Laya checkpoint](https://huggingface.co/pleveneur/laya-multilingual-onnx) is available in the **split encoder/head format** required by this benchmark. This can avoid the resource-intensive PyTorch export step. The model card lists all four file SHA-256 digests. This is an independently published conversion, not an official upstream artifact. Its compatibility is not yet validated on Safari.
+
+**First try this path instead of the PyTorch exporter:**
+
+```bash
+python3 -m pip install huggingface_hub
+python3 scripts/fetch-split-onnx.py --dry-run
+python3 scripts/fetch-split-onnx.py
+npm run dev
+```
+
+The fetch script resolves an immutable Hugging Face commit, verifies file lengths and the four publisher-reported SHA-256 digests, copies the model into the untracked `public/models/laya/` directory, and writes `source.json` and `manifest.json`. No weights are committed. It will download **approximately 1.23 GiB** and need additional disk space. This model is **multilingual** (322M parameters), whereas `scripts/export-model.py` generates the **English** (421M) model. Record the variant in comparisons.
+
+Even with verified hashes, the published model is huge for Safari WASM. **The model may fail to load or Safari may terminate the page.** This would be a genuine feasibility result, not a benchmark success. Do not report model correctness or latency until the physical iPhone executes actual inferences.
+
+If avoiding third-party exports is preferred, use the pinned PyTorch export path in section 2 above instead.
