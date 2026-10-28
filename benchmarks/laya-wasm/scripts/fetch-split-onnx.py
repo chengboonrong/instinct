@@ -17,6 +17,7 @@ import shutil
 import sys
 
 REPOSITORY = "pleveneur/laya-multilingual-onnx"
+REVISION = "43eec88d98b79714f89d2acfdd3efedc88af1739"
 # Publisher's public model card, 2026-10-28:
 # https://huggingface.co/pleveneur/laya-multilingual-onnx
 EXPECTED = {
@@ -40,6 +41,7 @@ def main():
     args = parser.parse_args()
     total = sum(size for size, _ in EXPECTED.values())
     print(f"Source: https://huggingface.co/{REPOSITORY}")
+    print(f"Pinned revision: {REVISION}")
     print(f"Expected bytes: {total} ({total / 2**30:.2f} GiB)")
     print("Verify SHA256 of each downloaded file; do not use if verification fails.")
     if args.dry_run:
@@ -58,8 +60,8 @@ def main():
         sys.exit("Install huggingface_hub: python3 -m pip install huggingface_hub")
 
     api = HfApi()
-    revision = api.model_info(REPOSITORY).sha
-    if not revision or len(revision) != 40:
+    revision = api.model_info(REPOSITORY, revision=REVISION).sha
+    if revision != REVISION:
         sys.exit("Could not resolve an immutable model revision")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for name, (size, sha) in EXPECTED.items():

@@ -6,7 +6,11 @@
     "postinstall": "node scripts/force-wasm.mjs",
     "dev": "node scripts/force-wasm.mjs && node scripts/prepare-wasm-assets.mjs && vite --host 0.0.0.0",
     "build": "node scripts/force-wasm.mjs && node scripts/prepare-wasm-assets.mjs && vite build",
-    "bootstrap": "node scripts/bootstrap-laya.mjs"
+    "bootstrap": "node scripts/bootstrap-laya.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:python": "python3 -m unittest discover -s tests -p 'test_*.py'",
+    "test:all": "npm test && npm run test:python",
+    "test:model": "node scripts/smoke-wasm.mjs"
   },
   "dependencies": {
     "laya-ts": "file:vendor/laya/laya-ts",
