@@ -1,18 +1,32 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const p = path.resolve("node_modules/laya-ts/dist/providers.js");
-if (!fs.existsSync(p)) throw new Error("laya-ts built provider not found: "+p);
-const source = fs.readFileSync(p,"utf8");
-const mixed = 'executionProviders: ["webgpu", "wasm"]';
-const wasm = 'executionProviders: ["wasm"]';
-const occurrences = source.split(mixed).length-1;
-if (occurrences===1) {
-  fs.writeFileSync(p,source.replace(mixed,wasm));
-  console.log("Verified patch: encoder now requests WASM only.");
-} else if (occurrences===0 && !source.includes('"webgpu"')) {
-  if (!source.includes(wasm)) throw new Error("WASM provider not verifiable");
-  console.log("WASM-only provider previously patched; verified.");
-} else {
-  throw new Error("Provider source unexpected. Refusing benchmark to avoid unverified WebGPU fallback. Occurrences="+occurrences);
+// Fail closed when Laya changes how it instantiates ONNX Runtime or selects providers.
+// Vite cannot resolve the upstream expression import(/* @vite-ignore */ spec)
+// where spec is a computed bare module name.
+const file = path.resolve("node_modules/laya-ts/dist/providers.js");
+if (!fs.existsSync(file)) throw new Error(`Laya provider missing: ${file}. Run npm run bootstrap first.`);
+let code = fs.readFileSync(file, "utf8");
+const originalEp = 'executionProviders: ["webgpu", "wasm"]';
+const wasmEp = 'executionProviders: ["wasm"]';
+const dynamicImport = /const spec = "onnxruntime-" \+ "web";\s*const ort = await import\(\/\* @vite-ignore \*\/ spec\);/g;
+const staticImport = 'const ort = await import("onnxruntime-web");';
+
+const epCount = code.split(originalEp).length - 1;
+if (epCount === 1) {
+  code = code.replace(originalEp, wasmEp);
+} else if (epCount !== 0 || code.includes('executionProviders: ["webgpu"') || !code.includes(wasmEp)) {
+  throw new Error("Unexpected Laya execution-provider source; refusing ambiguous WASM results");
 }
+
+const dynamicMatches = [...code.matchAll(dynamicImport)];
+if (dynamicMatches.length === 1) {
+  code = code.replace(dynamicImport, staticImport);
+} else if (dynamicMatches.length !== 0 || !code.includes(staticImport)) {
+  throw new Error("Unexpected dynamic browser ONNX import; refusing an unbundled runtime");
+}
+if (code.includes(originalEp) || code.includes('executionProviders: ["webgpu"')) {
+  throw new Error("Laya encoder still references WebGPU; refusing WASM benchmark");
+}
+fs.writeFileSync(file, code);
+console.log("Verified Laya browser adapter: WASM-only encoder, Vite-resolvable ONNX Runtime import.");
