@@ -49,14 +49,14 @@ subprocess.run(
      "--out-dir", str(out_dir), "--seq-len", "16", "--verify-len", "512"],
     check=True, cwd=repo_dir
 )
-subprocess.run(
-    [sys.executable, str(root / "scripts" / "check-model.py"), str(out_dir)],
-    check=True, cwd=root
-)
 (out_dir / "source.json").write_text(json.dumps({
     "source": source_repo,
     "revision": checkpoint_revision,
     "exporter": "laya-ts/scripts/export_onnx.py",
     "verification": "Torch-vs-ONNX upstream exporter (seq 16 / 512)",
 }, indent=2)+"\n", encoding="utf-8")
+subprocess.run(
+    [sys.executable, str(root / "scripts" / "check-model.py"), str(out_dir)],
+    check=True, cwd=root
+)
 print("Export complete:", out_dir, flush=True)
