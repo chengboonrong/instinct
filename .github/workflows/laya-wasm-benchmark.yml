@@ -1,0 +1,24 @@
+name: Laya WASM benchmark build
+
+on:
+  pull_request:
+    paths:
+      - 'benchmarks/laya-wasm/**'
+      - '.github/workflows/laya-wasm-benchmark.yml'
+  workflow_dispatch:
+
+jobs:
+  browser-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: benchmarks/laya-wasm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - name: Check bundle exists
+        run: test -s dist/index.html && test -n "$(find dist/assets -name '*.js' -print -quit)"
