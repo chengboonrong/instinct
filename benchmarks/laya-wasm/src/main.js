@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { fixtures } from './fixtures.js';
 import { WorkerClient } from './worker-client.js';
 import { summarize,frameSummary,minuteWindows,recoverReport,toCsv,round } from './report.js';
+import { recordLoadEvent } from './load-diagnostics.js';
 const byId=id=>document.getElementById(id);
 const log=text=>{byId('status').textContent=text;};
 const checkpointKey='instinct-laya-wasm-checkpoint-v2';
@@ -41,12 +42,15 @@ function controls(active){busy=active;byId('start').disabled=active;byId('stop')
 function interrupt(reason) {
  if(!busy)return;
  stopped=true;client?.stop(reason);report.status='interrupted';report.error=reason;
+ if(report.phase==='loading')recordLoadEvent(report,{source:'page',stage:'interrupted',error:reason});
  if(report.sustained&&report.phase==='sustained')report.sustained.completed=false;
  save();log(reason+'; partial report saved.');
 }
 byId('stop').onclick=()=>interrupt('Stopped by user');
 document.addEventListener('visibilitychange',()=>{if(document.hidden)interrupt('Safari left foreground; run invalidated');});
 window.addEventListener('pagehide',()=>interrupt('Page closed or navigated away; run incomplete'));
+window.addEventListener('error',event=>interrupt('Page error: '+(event.error?.stack||`${event.message} (${event.filename}:${event.lineno}:${event.colno})`)));
+window.addEventListener('unhandledrejection',event=>interrupt('Unhandled page rejection: '+String(event.reason?.stack||event.reason)));
 async function sample(fixture,phase,phaseStart) {
  const started=performance.now();
  report.pendingSample={id:fixture.id,category:fixture.category,elapsedMs:round(started-phaseStart)};save();
@@ -81,9 +85,17 @@ byId('start').onclick=async()=>{
  runtimeVersion:'1.20.0',wasmThreads:1,workerInference:true,crossOriginIsolated,sharedArrayBuffer:typeof SharedArrayBuffer!=='undefined',hardwareConcurrency:navigator.hardwareConcurrency??null,
  cacheState:byId('cache').value,coldLoadMs:null,timeToFirstPredictionMs:null,downloadBytes:null,modelManifest:null,modelSource:null,modelBaseUrl,
  fixtureVersion:'mixed-v1',fixtureOrderSeed:seed,accuracy:null,accuracyNotes:'No human-curated labels; confidence is not accuracy',memory:null,thermal:null,
- inference:null,rendering:null,sustained:null,pendingSample:null};
+ inference:null,rendering:null,sustained:null,pendingSample:null,
+ loading:{diagnosticsVersion:1,events:[],files:{},lastEvent:null,lastWorkerEvent:null,pageHeartbeatAt:null}};
  controls(true);save();const start=performance.now();
+ const loadEvent=event=>{recordLoadEvent(report,{source:'page',...event});save();};
+ const heartbeat=setInterval(()=>{
+  if(report.phase==='loading'&&report.status==='running'){
+   report.loading.pageHeartbeatAt=new Date().toISOString();report.loading.pageElapsedMs=round(performance.now()-start);save();
+  }
+ },2000);
  try {
+  loadEvent({stage:'manifest-fetch'});
   log('Reading model manifest...');
   const response=await fetch('/models/laya/manifest.json',{cache:'no-store'});
   if(!response.ok)throw new Error('Model manifest missing; run model verification first');
@@ -94,16 +106,25 @@ byId('start').onclick=async()=>{
    if(!entry||!Number.isSafeInteger(entry.bytes)||entry.bytes<=0||!/^[a-f0-9]{64}$/i.test(entry.sha256))throw new Error('Invalid model manifest entry: '+name);
    expectedSha256[name]=entry.sha256;
   }
+  loadEvent({stage:'manifest-ready'});
+  loadEvent({stage:'provenance-fetch'});
   const source=await fetch('/models/laya/source.json',{cache:'no-store'});
   if(source.ok)report.modelSource=await source.json();
   if(stopped)throw new Error('Load interrupted before worker creation');
   client=new WorkerClient(new Worker(new URL('./inference-worker.js',import.meta.url),{type:'module'}));
+  loadEvent({stage:'worker-created'});
   log('Downloading and verifying model; 1.23 GiB. Loading may exceed Safari memory limits.');
-  const loaded=await client.request('load',{modelBaseUrl,expectedSha256},900000,progress=>log('Model load: '+progress.file+' ('+progress.done+'/'+progress.total+'). ONNX download/session creation can take several minutes.'));
+  const loaded=await client.request('load',{modelBaseUrl,expectedSha256},900000,progress=>{
+   loadEvent(progress);
+   const bytes=Number.isFinite(progress.receivedBytes)?` — ${progress.receivedBytes.toLocaleString()}${Number.isFinite(progress.totalBytes)?'/'+progress.totalBytes.toLocaleString():''} bytes`:'';
+   log(`Model load: ${progress.stage}${progress.file?' — '+progress.file:''}${bytes}. Keep Safari open; diagnostic checkpoints are saved.`);
+  });
   report.coldLoadMs=round(performance.now()-start);report.downloadBytes=loaded.downloadBytes;save();
+  loadEvent({stage:'first-prediction'});
   log('Running first prediction (excluded from timed samples)...');
   await client.request('predict',fixtures[0],120000);
   report.timeToFirstPredictionMs=round(performance.now()-start);save();
+  loadEvent({stage:'first-prediction-ready'});
   captureFrames();log('Rendering-only baseline: 5 seconds...');await sleep(5000);
   if(stopped)throw new Error('Baseline interrupted');
   report.rendering={baseline:frameSummary(frames)};frames=[];
@@ -118,8 +139,8 @@ byId('start').onclick=async()=>{
   report.rendering.duringInference=frameSummary(frames);
   report.status=stopped?'interrupted':'discrete-complete';
   log((stopped?'Run interrupted.':'100 decisions complete.')+' Export results before the 10-minute soak.');
- }catch(error){report.status=stopped?'interrupted':'failed';report.error=String(error);client?.stop();log('FAILED (recorded): '+String(error));}
- finally{stopFrames();save();controls(false);}
+ }catch(error){report.status=stopped?'interrupted':'failed';report.error=String(error);if(report.phase==='loading')loadEvent({stage:'load-ended',error:String(error?.stack||error)});client?.stop();log('FAILED (recorded): '+String(error));}
+ finally{clearInterval(heartbeat);stopFrames();save();controls(false);}
 };
 byId('soak').onclick=async()=>{
  if(busy||!client||client.stopped||document.hidden)return;

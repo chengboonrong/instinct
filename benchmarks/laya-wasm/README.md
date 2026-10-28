@@ -56,6 +56,16 @@ Reports include seed/versioned fixtures, successful p50/p95/p99, failure rate, r
 
 Reports checkpoint before and after each prediction. Reloaded active runs recover as **interrupted**, with pending predictions recorded as failures with unknown elapsed time. Manual stop, timeout, page hide and backgrounding invalidate completion. Browser storage can fail or be evicted; exports remain necessary. There is no automatic resume of a benchmark across page lifetimes.
 
+### Diagnosing an interrupted load
+
+Loading now checkpoints streamed response-body byte counts (at most twice per second per response), HTTP/network/stream errors, SHA-256 verification, JSON parsing, encoder/head session creation and first prediction. The diagnostic stream passes chunks through without retaining another model-sized buffer. The pinned adapter forwards provider progress through `Agent.load`. Diagnostics are additive to the v2 report; old reports still recover.
+
+Export **JSON**, including for failed runs. `loading.files` retains each file's latest state; `loading.events` keeps the last 80 events; `loading.lastWorkerEvent` identifies the last activity received from the worker. `loading.pageHeartbeatAt` is saved every two seconds during loading, separately from worker progress. A recent page heartbeat with old worker progress shows that the page was active; it does not establish a worker crash. Worker errors include source locations when Safari provides them. All timestamps are observations, not a diagnosis of why iOS terminated a page.
+
+Byte counts describe the consumed response body, not wire traffic or cache state. Missing/compressed Content-Length remains unknown. A completed download is not a verified hash or a ready session. Optional `.onnx.data` sidecar HTTP 404s can be normal for this single-file export; inspect subsequent stages before treating them as fatal. Network/cache fallback can also produce a successful load after a failed request. The instrumentation is active only during model loading; cold-load timings include its overhead.
+
+For the next phone run: export the previous report first, reload the latest deployment, attest the actual device and enter the exact iOS/Safari build, then keep Safari foreground with the screen awake. If loading stops, export JSON immediately; after an involuntary reload, export the recovered checkpoint before starting again. This cannot collect device results remotely. The immediate milestone remains one verified physical-device prediction, followed by the 100-decision run and 600-second soak.
+
 ## Limits
 
 - Device identity is user-attested; user-agent text cannot prove an iPhone model.

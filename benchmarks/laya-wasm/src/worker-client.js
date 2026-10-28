@@ -7,7 +7,11 @@ export class WorkerClient {
    clearTimeout(pending.timer);this.pending.delete(data.id);
    if(data.error)pending.reject(new Error(data.error));else pending.resolve(data.result);
   };
-  worker.onerror=event=>{event.preventDefault?.();this.stop(event.message||'Inference worker crashed');};
+  worker.onerror=event=>{
+   event.preventDefault?.();
+   const location=event.filename?` (${event.filename}:${event.lineno??0}:${event.colno??0})`:'';
+   this.stop((event.message||'Inference worker crashed')+location);
+  };
   worker.onmessageerror=()=>this.stop('Inference worker message could not be decoded');
  }
  request(type,payload,timeoutMs,onProgress) {

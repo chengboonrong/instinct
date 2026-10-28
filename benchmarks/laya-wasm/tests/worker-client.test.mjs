@@ -29,3 +29,9 @@ test('worker crash rejects outstanding operation',async()=>{
  worker.onerror({message:'WASM crash',preventDefault(){}});
  await assert.rejects(result,/WASM crash/); assert.equal(worker.terminated,true);
 });
+test('worker crash preserves source location for exported diagnostics',async()=>{
+ const worker=new WorkerDouble();const client=new WorkerClient(worker);
+ const result=client.request('load',{},1000);
+ worker.onerror({message:'RuntimeError: unreachable',filename:'https://example.test/assets/worker.js',lineno:42,colno:7,preventDefault(){}});
+ await assert.rejects(result,/RuntimeError: unreachable.*worker\.js:42:7/);
+});
