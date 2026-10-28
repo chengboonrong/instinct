@@ -27,3 +27,13 @@
 ## Spec
 
 See [research protocol](../../docs/research/laya-iphone15-plus-wasm-benchmark.md).
+
+## Model artifact integrity gate
+
+After exporting Laya's ONNX artifacts into `public/models/laya`, run:
+
+```bash
+python3 scripts/check-model.py public/models/laya
+```
+
+This checks the required ONNX/JSON files, parses JSON, and writes `manifest.json` containing each file's SHA256 and byte size. It does **not** prove that the ONNX graph is valid or that Safari inference succeeds. Keep exported weights out of Git; record the source checkpoint commit and validate ONNX parity separately.
