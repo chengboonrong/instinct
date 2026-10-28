@@ -18,6 +18,10 @@ jobs:
           node-version: '22'
       - run: node scripts/bootstrap-laya.mjs
       - run: npm install --no-audit --no-fund
+      - name: Validate model fetch utility (no network/weights)
+        run: |
+          python3 -m py_compile scripts/fetch-split-onnx.py scripts/check-model.py scripts/export-model.py
+          python3 scripts/fetch-split-onnx.py --dry-run
       - run: npm run build
       - run: test -s dist/index.html && test -n "$(find dist/assets -name '*.js' -print -quit)"
       - name: Verify WASM binaries were published
