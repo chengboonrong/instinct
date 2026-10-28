@@ -4,13 +4,13 @@
   "type": "module",
   "scripts": {
     "postinstall": "node scripts/force-wasm.mjs",
-    "dev": "node scripts/force-wasm.mjs && vite --host 0.0.0.0",
-    "build": "node scripts/force-wasm.mjs && vite build",
+    "dev": "node scripts/force-wasm.mjs && node scripts/prepare-wasm-assets.mjs && vite --host 0.0.0.0",
+    "build": "node scripts/force-wasm.mjs && node scripts/prepare-wasm-assets.mjs && vite build",
     "bootstrap": "node scripts/bootstrap-laya.mjs"
   },
   "dependencies": {
     "laya-ts": "file:vendor/laya/laya-ts",
-    "onnxruntime-web": "^1.20.0",
+    "onnxruntime-web": "1.20.0",
     "three": "^0.170.0"
   },
   "devDependencies": {
