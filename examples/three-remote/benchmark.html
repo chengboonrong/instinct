@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>Instinct · Mobile AI Benchmark</title>
+  <style>
+    :root{font:14px system-ui,-apple-system,sans-serif;color:#eef5ff;background:#0c1520}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100dvh}
+    header{padding:16px 18px;border-bottom:1px solid #395169;background:#162737}
+    h1{margin:0;font-size:22px;letter-spacing:-.6px}
+    header p{color:#acc0d2;margin:5px 0 0}
+    main{max-width:900px;margin:auto;padding:14px;display:grid;gap:12px}
+    .panel{border:1px solid #364d63;border-radius:12px;padding:14px;background:#142434}
+    .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px}
+    label{display:grid;gap:6px;color:#b4c8dc;font-size:12px;font-weight:600}
+    label.checkbox{display:flex;align-items:center;gap:9px;margin-top:12px}
+    select,button,textarea{font:inherit;border-radius:7px;padding:10px;border:1px solid #456079;background:#0c1c2c;color:#eff7ff;max-width:100%}
+    input{accent-color:#c4e886}
+    button{min-height:44px;cursor:pointer;font-weight:600}
+    button.primary{background:#cfed8b;border-color:#cfed8b;color:#17241b}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    .buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    #viewport{aspect-ratio:16/9;min-height:210px;max-height:55dvh;background:#0b121b;border-radius:12px;overflow:hidden}
+    canvas{display:block;width:100%;height:100%;touch-action:none}
+    #progress{font-weight:700;margin-top:9px}
+    #metrics{font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:#b8e4cb;overflow-wrap:anywhere}
+    #report{width:100%;min-height:145px;font:11px/1.5 ui-monospace,monospace;resize:vertical}
+    .note{font-size:12px;color:#aabfd0;line-height:1.6}
+    @media(max-width:600px){header{padding:13px}main{padding:9px}.panel{padding:11px}#viewport{aspect-ratio:4/3;min-height:230px}}
+  </style>
+</head>
+<body>
+  <header><h1>◈ Instinct / Mobile AI Benchmark</h1><p>Browser-only, local data. No debugger bridge or analytics upload.</p></header>
+  <main>
+    <section class="panel">
+      <div class="fields">
+        <label for="agents">NPC count<select id="agents"><option value="50">50 NPCs</option><option value="100">100 NPCs</option><option value="250">250 NPCs</option><option value="500">500 NPCs (stress)</option></select></label>
+        <label for="minutes">Duration<select id="minutes"><option value="0.5">30 seconds (smoke)</option><option value="1">1 minute</option><option value="10">10 minutes</option><option value="30">30 minutes</option></select></label>
+      </div>
+      <label class="checkbox"><input id="trace" type="checkbox"/> Instrument one NPC (diagnostic overhead comparison)</label>
+      <div class="buttons"><button id="start" class="primary">Start benchmark</button><button id="stop" disabled>Stop and generate report</button><button id="reset">Reset</button></div>
+      <div id="progress" role="status">Ready to run</div>
+    </section>
+    <section id="viewport" aria-label="Three.js scene preview"></section>
+    <section class="panel"><strong>Live metrics</strong><div id="metrics" role="status">Waiting for first frame…</div></section>
+    <section class="panel">
+      <strong>Device report</strong>
+      <p class="note">Includes frame intervals, CPU-side render cost, AI scheduler timing, skipped simulation time, WebGL counters and lifecycle events. It does not measure GPU memory bytes or thermals. Reports stay in your browser until you export them.</p>
+      <textarea id="report" aria-label="Benchmark JSON report" readonly placeholder="Start and stop a benchmark to generate JSON."></textarea>
+      <div class="buttons"><button id="download" disabled>Download JSON</button><button id="copy" disabled>Copy JSON</button></div>
+      <p class="note">To test on an iPhone, serve this page from a trusted local network or HTTPS, and keep the screen active. Record the device model and iOS version separately.</p>
+    </section>
+  </main>
+  <script type="module" src="/src/benchmark.ts"></script>
+</body>
+</html>

@@ -31,6 +31,15 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Build standalone mobile device benchmark site
+        run: npm run build:mobile --workspace=@instinct/example-remote
+      - name: Preserve static device benchmark site
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-benchmark-site
+          path: examples/three-remote/dist-mobile/
+          if-no-files-found: error
+          retention-days: 14
       - name: Benchmark synthetic AI scheduler load (non-gating)
         run: node scripts/benchmark-ai.mjs > ai-benchmark.json
       - name: Preserve AI benchmark baseline
@@ -42,6 +51,9 @@ jobs:
   browser:
     needs: validate
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --user 1001
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -53,8 +65,6 @@ jobs:
         run: npm ci
       - name: Build workspace packages for local bridge and Vite
         run: npm run build
-      - name: Install Chromium and WebKit browser engines
-        run: npx playwright install --with-deps --only-shell chromium webkit
       - name: Run real browser acceptance
         run: npm run test:e2e
       - name: Preserve browser traces on failure

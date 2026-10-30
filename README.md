@@ -45,3 +45,7 @@ To run the game/editor integration, see [Local Game Bridge](docs/bridge.md). No 
 MIT.
 
 See [Visual Editor](docs/editor.md), [Runtime Debugger](docs/debugging.md), [Bridge](docs/bridge.md), [HSM](docs/state-machines.md), [Blackboard](docs/blackboards.md) and [Three.js](docs/three.md) guides.
+
+## Physical device profiling
+
+The optional [mobile benchmark harness](docs/physical-device-benchmark.md) runs 50–500 placeholder Instinct NPCs with a configurable tracing switch, WebGL diagnostics and device-local JSON export. Open `/benchmark.html` on the existing Three.js example dev server. This is a diagnostic instrument, **not** physical iPhone Safari certification; release validation is tracked in Issue #12.
