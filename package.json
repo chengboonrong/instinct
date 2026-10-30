@@ -10,7 +10,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
-    "typecheck": "tsc -b packages/core/tsconfig.json"
+    "typecheck": "tsc -b packages/core/tsconfig.json packages/hsm/tsconfig.json"
   },
   "devDependencies": {
     "typescript": "^5.7.3",
