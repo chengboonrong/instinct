@@ -1,0 +1,8 @@
+node_modules/
+vendor/
+dist/
+public/models/
+public/wasm/
+*.log
+__pycache__/
+.venv/

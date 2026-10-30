@@ -1,0 +1,23 @@
+{
+  "name": "instinct-laya-wasm-benchmark",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "postinstall": "node scripts/force-wasm.mjs",
+    "dev": "node scripts/force-wasm.mjs && node scripts/prepare-wasm-assets.mjs && vite --host 0.0.0.0",
+    "build": "node scripts/force-wasm.mjs && node scripts/prepare-wasm-assets.mjs && vite build",
+    "bootstrap": "node scripts/bootstrap-laya.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:python": "python3 -m unittest discover -s tests -p 'test_*.py'",
+    "test:all": "npm test && npm run test:python",
+    "test:model": "node scripts/smoke-wasm.mjs"
+  },
+  "dependencies": {
+    "laya-ts": "file:vendor/laya/laya-ts",
+    "onnxruntime-web": "1.20.0",
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
