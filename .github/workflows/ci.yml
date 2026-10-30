@@ -2,6 +2,8 @@ name: CI
 on:
   push:
   pull_request:
+permissions:
+  contents: read
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -10,7 +12,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install
+          cache: npm
+      - name: Install exactly locked dependencies
+        run: npm ci
+      - name: Report dependency advisories
+        run: node scripts/report-audit.mjs
+      - name: Preserve dependency audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit
+          path: |
+            package-lock.json
+            audit-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Enforce zero moderate-or-higher advisories
+        run: npm audit --audit-level=moderate
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
