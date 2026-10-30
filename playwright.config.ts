@@ -17,12 +17,27 @@ export default defineConfig({
   },
   projects: [{
     name: 'chromium',
+    testIgnore: '**/mobile.spec.ts',
     use: {
       ...devices['Desktop Chrome'],
       launchOptions: {
         args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
       },
     },
+  }, {
+    name: 'webkit-desktop',
+    use: {
+      ...devices['Desktop Safari'],
+      browserName: 'webkit',
+    },
+    testIgnore: '**/mobile.spec.ts',
+  }, {
+    name: 'webkit-mobile',
+    use: {
+      ...devices['iPhone 13'],
+      browserName: 'webkit',
+    },
+    testMatch: '**/mobile.spec.ts',
   }],
   webServer: [
     {

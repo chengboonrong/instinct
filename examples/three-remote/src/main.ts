@@ -80,6 +80,21 @@ const guards = [
   createNpc('guard-one', 'Market Guard', -3.5, 0xff887b),
   createNpc('guard-two', 'Rooftop Guard', 3.5, 0xf1bf6a),
 ];
+document.getElementById('damage-one')!.addEventListener('click', () => guards[0]!.hurt());
+document.getElementById('damage-two')!.addEventListener('click', () => guards[1]!.hurt());
+let contextLosses = 0;
+let contextRestores = 0;
+renderer.domElement.addEventListener('webglcontextlost', event => {
+  event.preventDefault();
+  contextLosses++;
+});
+renderer.domElement.addEventListener('webglcontextrestored', () => {contextRestores++;});
+const perfHud = document.getElementById('perf-stats')!;
+let frames = 0;
+let aiUpdates = 0;
+let droppedSeconds = 0;
+let renderMs = 0;
+let startedAt = performance.now();
 const status = document.getElementById('bridge-status')!;
 const button = document.getElementById('bridge-connect') as HTMLButtonElement;
 button.addEventListener('click', () => {
@@ -119,9 +134,24 @@ function frame() {
   const unit = Math.hypot(dx, dz) || 1;
   player.position.x = THREE.MathUtils.clamp(player.position.x + dx / unit * dt * 4, -10, 10);
   player.position.z = THREE.MathUtils.clamp(player.position.z + dz / unit * dt * 4, -9, 9);
-  scheduler.tick(dt);
-  scoreboard.textContent = guards.map(npc => npc.label + ' HP ' + npc.health()).join(' · ');
+  const stats = scheduler.tick(dt);
+  aiUpdates += stats.updates;
+  droppedSeconds += stats.discardedSeconds;
+  const renderStart = performance.now();
   renderer.render(scene, camera);
+  renderMs += performance.now() - renderStart;
+  frames++;
+  if (frames % 60 === 0) {
+    const elapsedMs = Math.max(1, performance.now() - startedAt);
+    perfHud.textContent = 'Renderer frames: ' + frames +
+      ' · avg FPS: ' + Math.round((frames * 1000) / elapsedMs) +
+      ' · avg render ms: ' + (renderMs / frames).toFixed(2) +
+      ' · AI updates: ' + aiUpdates +
+      ' · skipped sim s: ' + droppedSeconds.toFixed(3) +
+      ' · textures: ' + renderer.info.memory.textures +
+      ' · WebGL losses: ' + contextLosses + ' / restores: ' + contextRestores;
+  }
+  scoreboard.textContent = guards.map(npc => npc.label + ' HP ' + npc.health()).join(' · ');
 }
 frame();
 window.addEventListener('resize', () => {
