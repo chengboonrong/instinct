@@ -24,6 +24,7 @@ export interface BridgeOptions {
 const MAX_MESSAGE_BYTES = 160_000;
 const AGENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const STATUSES = new Set(['running', 'success', 'failure', 'aborted']);
+const isStatus = (v: unknown): boolean => typeof v === 'string' && STATUSES.has(v);
 const safeObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 function ensureUrl(value: string): string {
@@ -50,13 +51,13 @@ export function validateRemoteFrame(value: unknown): value is RemoteFrame {
       !safeObject(trace.nodeStatuses) || Object.keys(trace.nodeStatuses).length > 256 ||
       !safeObject(trace.blackboard) || Object.keys(trace.blackboard).length > 96 ||
       !Array.isArray(trace.entries) || trace.entries.length > 256) return false;
-  if (Object.entries(trace.nodeStatuses).some(([id, status]) => !AGENT_ID.test(id) || !STATUSES.has(String(status)))) return false;
+  if (Object.entries(trace.nodeStatuses).some(([id, status]) => !AGENT_ID.test(id) || !isStatus(status))) return false;
   if (Object.entries(trace.blackboard).some(([key, text]) => key.length > 80 || typeof text !== 'string' || text.length > 120)) return false;
   for (const event of trace.entries) {
     if (!safeObject(event) || !Number.isSafeInteger(event.sequence) || !Number.isSafeInteger(event.tick) ||
         event.kind !== 'node' && event.kind !== 'blackboard') return false;
     if (event.kind === 'node' && (typeof event.nodeId !== 'string' || !AGENT_ID.test(event.nodeId) ||
-        !STATUSES.has(String(event.status)))) return false;
+        !isStatus(event.status))) return false;
     if (event.kind === 'blackboard' && (typeof event.key !== 'string' || event.key.length > 80 ||
         typeof event.previous !== 'string' || typeof event.current !== 'string')) return false;
   }
@@ -69,7 +70,8 @@ function decode(data: string): unknown {
 function socketSend(socket: WebSocket, value: unknown): void {
   if (socket.readyState !== WebSocket.OPEN) return;
   const payload = JSON.stringify(value);
-  if (payload.length > MAX_MESSAGE_BYTES) return;
+  // The relay limit is in bytes; going over it closes the socket.
+  if (new TextEncoder().encode(payload).length > MAX_MESSAGE_BYTES) return;
   socket.send(payload);
 }
 class BaseConnection {

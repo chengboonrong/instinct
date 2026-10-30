@@ -70,7 +70,7 @@ export function validateGraph(input: unknown): ValidationResult {
       if (Array.isArray(raw.children) && raw.children.length > 0) add('arity', 'Leaf nodes cannot have children', id);
     } else if (raw.kind === 'inverter') {
       if (Array.isArray(raw.children) && raw.children.length !== 1) add('arity', 'Inverter requires exactly one child', id);
-    } else if (kinds.has(String(raw.kind))) {
+    } else if (typeof raw.kind === 'string' && kinds.has(raw.kind)) {
       if (Array.isArray(raw.children) && raw.children.length === 0) add('arity', 'Composite requires at least one child', id);
     }
     // Validation completes before the representation is ever passed to the compiler.

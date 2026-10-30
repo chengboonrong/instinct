@@ -109,6 +109,7 @@ export class ThreeAgent<S extends object, E extends EventObject = EventObject> {
     if (!Number.isFinite(dt) || dt < 0) throw new RangeError('dt must be finite and nonnegative');
     if (!this.running) return;
     this.sense?.(this, dt);
+    if (!this.running) return;
     this.machine?.update(dt);
     this.syncBehavior();
     this.activeBehavior?.tick(dt);
@@ -116,10 +117,17 @@ export class ThreeAgent<S extends object, E extends EventObject = EventObject> {
 
   stop(): void {
     if (!this.started) return;
-    this.activeBehavior?.stop();
-    this.activeBehavior = undefined;
-    this.started = false;
-    this.machine?.stop();
+    try {
+      this.machine?.stop();
+    } finally {
+      // The HSM refuses to stop from its own callbacks; keep running in step with it.
+      if (!this.machine?.running) {
+        const behavior = this.activeBehavior;
+        this.activeBehavior = undefined;
+        this.started = false;
+        behavior?.stop();
+      }
+    }
   }
 
   dispose(): void {

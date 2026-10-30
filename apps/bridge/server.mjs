@@ -39,7 +39,12 @@ export function createBridgeServer({port = 7331, token = randomBytes(24).toStrin
     response.writeHead(404, {'Content-Type': 'text/plain', 'Cache-Control': 'no-store'});
     response.end('Not found');
   });
-  const wss = new WebSocketServer({server: http, maxPayload: LIMIT});
+  const wss = new WebSocketServer({
+    server: http,
+    maxPayload: LIMIT,
+    // Refuse during the handshake, so a rejected client never gets a socket to abuse.
+    verifyClient: ({origin, req}) => isLoopbackAddress(req.socket.remoteAddress) && validOrigin(origin),
+  });
   const clients = new Map();
   const agents = new Map(); // agentId -> {owner, frame}
   const roster = () => [...agents.values()].map(({frame}) => ({id: frame.id, label: frame.label}));
@@ -53,14 +58,9 @@ export function createBridgeServer({port = 7331, token = randomBytes(24).toStrin
       const addr = http.address();
       resolve({port: addr.port, url: 'ws://127.0.0.1:' + addr.port});
     });
-    http.once('error', reject);
+    wss.on('error', reject); // ws re-emits http errors, and would throw with no listener.
   });
-  wss.on('connection', (ws, request) => {
-    if (!isLoopbackAddress(request.socket.remoteAddress) ||
-        !validOrigin(request.headers.origin)) {
-      ws.close(1008, 'Local origins only');
-      return;
-    }
+  wss.on('connection', ws => {
     const client = {role: null, selected: null};
     clients.set(ws, client);
     const authTimer = setTimeout(() => {if (!client.role) ws.close(1008, 'Authentication required');}, 5000);

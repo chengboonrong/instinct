@@ -113,10 +113,24 @@ export class Inverter<B extends object = Blackboard> implements Node<B> {
 
 /** Each Agent needs its own node instances: execution state is not shared. */
 export class Agent<B extends object = Blackboard> {
+  private ticking = false;
+  private stopRequested = false;
   constructor(readonly root: Node<B>, readonly blackboard: B) {}
   tick(dt: number): Status {
     if (!Number.isFinite(dt) || dt < 0) throw new RangeError('dt must be finite and nonnegative');
-    return this.root.tick({dt, blackboard: this.blackboard});
+    if (this.ticking) throw new Error('Agent.tick cannot run recursively');
+    this.ticking = true;
+    try {
+      return this.root.tick({dt, blackboard: this.blackboard});
+    } finally {
+      this.ticking = false;
+      if (this.stopRequested) this.stop();
+    }
   }
-  stop(): void { this.root.reset(); }
+  /** Cancel running work. Called from inside this tree's own tick, it applies when that tick ends. */
+  stop(): void {
+    if (this.ticking) { this.stopRequested = true; return; }
+    this.stopRequested = false;
+    this.root.reset();
+  }
 }

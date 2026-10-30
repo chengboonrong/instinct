@@ -17,8 +17,10 @@ Move the blue player with WASD / arrow keys and press F near the enemy. The red 
 - `ThreeAgent` binds `THREE.Object3D`, one `BlackboardStore`, an optional HSM and Behavior Tree Agents.
 - A map such as `behaviors: {'combat.chase': chaseTree, combat: combatFallback}` selects the most specific matching state path.
 - All HSMs and trees must reference exactly the same per-agent store; constructor validates identity.
-- `start()` activates the controller, `send(event)` performs transitions and immediately cancels displaced running behaviors, `update(dt)` senses, advances HSM and ticks the active BT, `stop()` cancels work, `dispose()` permanently shuts down the controller.
+- `start()` activates the controller, `send(event)` performs transitions and cancels displaced running behaviors, `update(dt)` senses, advances HSM and ticks the active BT, `stop()` cancels work, `dispose()` permanently shuts down the controller.
 - For immediate cancel semantics, dispatch events through `ThreeAgent.send()` instead of invoking the HSM directly.
+- Cancellation is immediate, except that a tree calling `send()` or `stop()` on its own NPC finishes its current tick first. `sense` may also call `stop()`.
+- Do not call `stop()` from HSM callbacks: it throws during `send()` and `update()`, does nothing during `start()`, and the NPC keeps running.
 - Each NPC needs independent tree *instances*. Reuse definitions, not the stateful node instances.
 
 ## Movement helpers

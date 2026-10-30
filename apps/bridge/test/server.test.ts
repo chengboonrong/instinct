@@ -1,6 +1,7 @@
-import {afterEach, beforeEach, describe, expect, it} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {once} from 'node:events';
 import WebSocket from 'ws';
+import {DevtoolsPublisher} from '@instinct/bridge';
 import {sampleGraph} from '@instinct/definition';
 import {createBridgeServer} from '../server.mjs';
 
@@ -60,8 +61,25 @@ describe('local authenticated bridge', () => {
     expect((await closed)[0]).toBe(1008);
     const evil = new WebSocket(url, {origin: 'https://attacker.example'});
     sockets.push(evil);
-    const close = once(evil, 'close');
-    expect((await close)[0]).toBe(1008);
+    const [refused] = await once(evil, 'error');
+    expect(refused.message).toContain('401');
+  });
+  it('rejects ready instead of crashing when the port is taken', async () => {
+    const clash = createBridgeServer({port: Number(new URL(url).port), token});
+    await expect(clash.ready).rejects.toThrow('EADDRINUSE');
+  });
+  it('keeps a game connected when a multi-byte frame is over the byte limit', async () => {
+    const studio = await client('studio');
+    await studio.messages.next();
+    await studio.messages.next();
+    const game = new DevtoolsPublisher({token, url});
+    game.connect();
+    await vi.waitFor(() => expect(game.connected).toBe(true));
+    const entry = {sequence: 1, tick: 1, kind: 'blackboard', key: 'k', previous: '界'.repeat(60_000), current: ''};
+    game.publish({...frame, id: 'wide', trace: {...frame.trace, entries: [entry]}});
+    game.publish({...frame, id: 'small'});
+    expect(await studio.messages.next()).toEqual({type: 'roster', agents: [{id: 'small', label: 'Guard One'}]});
+    game.close();
   });
   it('does not accept editor commands or another game taking an owned ID', async () => {
     const game = await client('game');
