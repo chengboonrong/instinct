@@ -2,7 +2,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {
   ReactFlow, Background, Controls, Handle, MiniMap, Position,
-  type Connection, type Edge, type EdgeChange, type Node, type NodeChange, type NodeProps,
+  type Connection, type Dimensions, type Edge, type EdgeChange, type Node, type NodeChange, type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './style.css';
@@ -143,10 +143,13 @@ function App() {
   const inRemoteMode = remoteFrame !== null;
   const validation = useMemo(() => validateGraph(visibleGraph), [visibleGraph]);
   const selected = visibleGraph.nodes.find(node => node.id === selectedId);
+  // Every trace update rebuilds the nodes. Without its size, React Flow hides a node until it is remeasured.
+  const measured = useRef(new Map<string, Dimensions>());
   const nodes = useMemo<FlowNode[]>(() => visibleGraph.nodes.map(n => ({
     id: n.id, type: 'behavior', position: n.position,
     data: {kind: n.kind, label: n.label, ...(n.task ? {task: n.task} : {}), root: n.id === graph.rootId, ...(visibleTrace && Object.hasOwn(visibleTrace.nodeStatuses, n.id) ? {debugStatus: visibleTrace.nodeStatuses[n.id]} : {})},
     selected: n.id === selectedId,
+    ...(measured.current.has(n.id) ? {measured: measured.current.get(n.id)!} : {}),
   })), [visibleGraph, selectedId, visibleTrace]);
   const edges = useMemo<Edge[]>(() => visibleGraph.nodes.flatMap(n => n.children.map((childId, index) => ({
     id: n.id + ':' + childId, source: n.id, target: childId,
@@ -162,6 +165,9 @@ function App() {
   }, [inRemoteMode]);
 
   const onNodesChange = useCallback((changes: NodeChange<FlowNode>[]) => {
+    for (const change of changes) {
+      if (change.type === 'dimensions' && change.dimensions) measured.current.set(change.id, change.dimensions);
+    }
     if (inRemoteMode) return;
     const positions = new Map<string, {x: number; y: number}>();
     const removed = new Set<string>();

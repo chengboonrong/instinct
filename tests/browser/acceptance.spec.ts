@@ -95,6 +95,30 @@ test('invalid token cannot list NPCs; reconnect works with correct token', async
   }
 });
 
+test('live trace updates never hide the tree', async ({browser}) => {
+  const {game, studio} = await openConnectedPair(browser);
+  try {
+    await studio.bringToFront();
+    await studio.locator('#remoteAgent').selectOption('guard-one');
+    await expect(studio.locator('.tree-node.trace-running').first()).toBeVisible();
+    const hiddenFrames = await studio.evaluate(() => new Promise<number>(resolve => {
+      let hidden = 0;
+      const end = performance.now() + 2000;
+      const sample = () => {
+        const nodes = [...document.querySelectorAll('.react-flow__node')];
+        if (nodes.some(node => getComputedStyle(node).visibility === 'hidden')) hidden++;
+        if (performance.now() < end) requestAnimationFrame(sample);
+        else resolve(hidden);
+      };
+      requestAnimationFrame(sample);
+    }));
+    expect(hiddenFrames).toBe(0);
+  } finally {
+    await game.close();
+    await studio.close();
+  }
+});
+
 test('a node id naming an Object.prototype member cannot blank Studio', async ({page}) => {
   await page.goto(STUDIO);
   const leaf = (id: string, task: string) => ({id, kind: 'action', label: id, task, children: [], position: {x: 300, y: 0}});
