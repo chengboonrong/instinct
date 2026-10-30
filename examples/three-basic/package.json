@@ -1,0 +1,16 @@
+{
+  "name": "@instinct/example-three",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0"
+  },
+  "dependencies": {
+    "three": "^0.175.0",
+    "@instinct/core": "file:../../packages/core"
+  },
+  "devDependencies": {
+    "vite": "^6.2.0",
+    "@types/three": "^0.175.0"
+  }
+}
