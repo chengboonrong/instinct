@@ -9,13 +9,15 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "test": "vitest run",
-    "typecheck": "tsc -b packages/core/tsconfig.json packages/hsm/tsconfig.json packages/blackboard/tsconfig.json packages/three/tsconfig.json packages/definition/tsconfig.json packages/devtools/tsconfig.json packages/bridge/tsconfig.json && tsc -p packages/blackboard/tsconfig.type-tests.json && tsc -p examples/three-combat/tsconfig.json && tsc -p examples/three-remote/tsconfig.json && tsc -p apps/editor/tsconfig.json"
+    "build": "npm run typecheck && npm run build --workspaces --if-present",
+    "test": "vitest run packages apps/bridge/test",
+    "typecheck": "tsc -b packages/core/tsconfig.json packages/hsm/tsconfig.json packages/blackboard/tsconfig.json packages/three/tsconfig.json packages/definition/tsconfig.json packages/devtools/tsconfig.json packages/bridge/tsconfig.json && tsc -p packages/blackboard/tsconfig.type-tests.json && tsc -p examples/three-combat/tsconfig.json && tsc -p examples/three-remote/tsconfig.json && tsc -p apps/editor/tsconfig.json",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "typescript": "^5.7.3",
     "vitest": "5.0.5",
-    "vite": "6.4.5"
+    "vite": "6.4.5",
+    "@playwright/test": "1.64.1"
   }
 }

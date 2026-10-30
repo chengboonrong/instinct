@@ -13,11 +13,11 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Install exactly locked dependencies
+      - name: Install locked dependencies
         run: npm ci
       - name: Report dependency advisories
         run: node scripts/report-audit.mjs
-      - name: Preserve dependency audit evidence
+      - name: Preserve dependency audit
         uses: actions/upload-artifact@v4
         with:
           name: dependency-audit
@@ -26,8 +26,36 @@ jobs:
             audit-report.json
           if-no-files-found: error
           retention-days: 7
-      - name: Enforce zero moderate-or-higher advisories
+      - name: Enforce zero moderate-or-higher vulnerabilities
         run: npm audit --audit-level=moderate
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+  browser:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build workspace packages for local bridge and Vite
+        run: npm run build
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps --only-shell chromium
+      - name: Run real browser acceptance
+        run: npm run test:e2e
+      - name: Preserve browser traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failures
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
