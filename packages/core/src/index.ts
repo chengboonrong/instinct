@@ -1,19 +1,19 @@
 /** The three standard behavior-tree execution outcomes. */
 export type Status = 'success' | 'failure' | 'running';
 export type Blackboard = Record<string, unknown>;
-export interface Context<B extends Blackboard = Blackboard> {
+export interface Context<B extends object = Blackboard> {
   readonly blackboard: B;
   readonly dt: number;
 }
-export interface Node<B extends Blackboard = Blackboard> {
+export interface Node<B extends object = Blackboard> {
   tick(context: Context<B>): Status;
   /** Cancel running work and restore initial execution state. */
   reset(): void;
 }
-export type ActionFn<B extends Blackboard> = (context: Context<B>) => Status;
-export type ConditionFn<B extends Blackboard> = (context: Context<B>) => boolean;
+export type ActionFn<B extends object> = (context: Context<B>) => Status;
+export type ConditionFn<B extends object> = (context: Context<B>) => boolean;
 
-export class Action<B extends Blackboard = Blackboard> implements Node<B> {
+export class Action<B extends object = Blackboard> implements Node<B> {
   private active = false;
   constructor(private readonly run: ActionFn<B>, private readonly onAbort?: () => void) {}
   tick(context: Context<B>): Status {
@@ -27,7 +27,7 @@ export class Action<B extends Blackboard = Blackboard> implements Node<B> {
   }
 }
 
-export class Condition<B extends Blackboard = Blackboard> implements Node<B> {
+export class Condition<B extends object = Blackboard> implements Node<B> {
   constructor(private readonly predicate: ConditionFn<B>) {}
   tick(context: Context<B>): Status {
     return this.predicate(context) ? 'success' : 'failure';
@@ -36,7 +36,7 @@ export class Condition<B extends Blackboard = Blackboard> implements Node<B> {
 }
 
 /** A memory sequence resumes the last running child. */
-export class Sequence<B extends Blackboard = Blackboard> implements Node<B> {
+export class Sequence<B extends object = Blackboard> implements Node<B> {
   private cursor = 0;
   constructor(private readonly children: readonly Node<B>[]) {}
   tick(context: Context<B>): Status {
@@ -56,7 +56,7 @@ export class Sequence<B extends Blackboard = Blackboard> implements Node<B> {
 }
 
 /** A memory selector resumes the last running branch. */
-export class Selector<B extends Blackboard = Blackboard> implements Node<B> {
+export class Selector<B extends object = Blackboard> implements Node<B> {
   private cursor = 0;
   constructor(private readonly children: readonly Node<B>[]) {}
   tick(context: Context<B>): Status {
@@ -76,7 +76,7 @@ export class Selector<B extends Blackboard = Blackboard> implements Node<B> {
 }
 
 /** Reevaluate higher-priority branches on every tick and abort displaced work. */
-export class ReactiveSelector<B extends Blackboard = Blackboard> implements Node<B> {
+export class ReactiveSelector<B extends object = Blackboard> implements Node<B> {
   private active = -1;
   constructor(private readonly children: readonly Node<B>[]) {}
   tick(context: Context<B>): Status {
@@ -102,7 +102,7 @@ export class ReactiveSelector<B extends Blackboard = Blackboard> implements Node
   }
 }
 
-export class Inverter<B extends Blackboard = Blackboard> implements Node<B> {
+export class Inverter<B extends object = Blackboard> implements Node<B> {
   constructor(private readonly child: Node<B>) {}
   tick(context: Context<B>): Status {
     const result = this.child.tick(context);
@@ -112,7 +112,7 @@ export class Inverter<B extends Blackboard = Blackboard> implements Node<B> {
 }
 
 /** Each Agent needs its own node instances: execution state is not shared. */
-export class Agent<B extends Blackboard = Blackboard> {
+export class Agent<B extends object = Blackboard> {
   constructor(readonly root: Node<B>, readonly blackboard: B) {}
   tick(dt: number): Status {
     if (!Number.isFinite(dt) || dt < 0) throw new RangeError('dt must be finite and nonnegative');

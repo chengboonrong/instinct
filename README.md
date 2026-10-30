@@ -14,6 +14,7 @@ A lightweight, engine-independent behavior-tree runtime written in TypeScript, w
 - Inverter decorator
 - Per-agent blackboard and timestep validation
 - Experimental hierarchical state machines (`@instinct/hsm`) with guarded transitions and event queues
+- Typed, scoped Blackboards (`@instinct/blackboard`) with parent inheritance, per-agent overrides and subscriptions
 - A minimal Three.js patrol guard demonstration
 - Vitest tests and GitHub Actions CI
 
@@ -36,3 +37,4 @@ Keep the runtime independent of rendering. Build a future Three.js adapter, type
 MIT. Open source, contributions welcome after APIs stabilize.
 
 See [HSM guide](docs/state-machines.md) for hierarchical state-machine semantics and an example.
+See [Blackboard guide](docs/blackboards.md) for shared BT/HSM state and scoped values.
