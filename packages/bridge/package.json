@@ -1,0 +1,23 @@
+{
+  "name": "@instinct/bridge",
+  "version": "0.1.0",
+  "description": "Local-only opt-in game-to-Studio debug transport",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@instinct/definition": "0.1.0",
+    "@instinct/devtools": "0.1.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}

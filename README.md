@@ -2,27 +2,29 @@
 
 **Give every character an instinct.**
 
-A lightweight, engine-independent behavior-tree runtime written in TypeScript, with a Three.js example. Inspired by the architecture and authoring experience of LimboAI, but not a port of its Godot code.
+Engine-independent game AI building blocks (Behavior Trees, hierarchical state machines, typed blackboards) plus opt-in Three.js tooling and a visual editor. Inspired by LimboAI's authoring workflow, but no Godot-specific runtime code is ported.
 
-> Experimental v0.1.0 source prototype. Not yet published to npm. Public API and runtime semantics can change.
+> Experimental v0.1.0-alpha. API unstable, not published to npm. All feature PRs are stacked drafts awaiting manual review.
 
-## What's included
+## Packages
 
-- Action and Condition nodes
-- Memory Sequence and Selector
-- Reactive priority Selector with branch interruption
-- Inverter decorator
-- Per-agent blackboard and timestep validation
-- Experimental hierarchical state machines (`@instinct/hsm`) with guarded transitions and event queues
-- Typed scoped Blackboards (`@instinct/blackboard`) with parent inheritance and change subscriptions
-- Three.js adapter (`@instinct/three`) with scene-object binding, state-matched behaviors and bounded fixed-rate AI scheduling
-- Versioned graph definitions and runtime compiler (`@instinct/definition`)
-- Opt-in node execution tracing, bounded history and typed Blackboard inspection (`@instinct/devtools`)
-- Browser-based React Flow Behavior Studio (`apps/editor`): node graph, inspector, child priority, validation, JSON import/export and a local live behavior debugger
-- Three.js patrol guard and interactive combat NPC demos
-- Vitest tests and GitHub Actions CI
+- `@instinct/core`: memory and reactive Behavior Tree runtime
+- `@instinct/hsm`: hierarchical state-machine runtime
+- `@instinct/blackboard`: typed scoped memory and notifications
+- `@instinct/definition`: JSON graph schema, validation and compilation
+- `@instinct/three`: Three.js controller and bounded fixed-step scheduler
+- `@instinct/devtools`: opt-in node execution tracing and Blackboard inspection
+- `@instinct/bridge`: dev-only local WebSocket publisher and read-only Studio viewer
 
-## Local development
+## Examples and tools
+
+- `apps/editor` — React Flow Behavior Studio with local preview and live game inspector
+- `apps/bridge` — loopback-only token-protected development relay
+- `examples/three-basic` — basic patrol guard
+- `examples/three-combat` — basic combat NPC
+- `examples/three-remote` — two live traced NPCs, selectable in Studio
+
+## Development
 
 ```sh
 npm install
@@ -30,16 +32,16 @@ npm run typecheck
 npm test
 npm run build
 npm run dev --workspace=@instinct/editor
-npm run dev --workspace=@instinct/example-three
-npm run dev --workspace=@instinct/example-combat
 ```
 
-## Design direction
+To run the game/editor integration, see [Local Game Bridge](docs/bridge.md). No production/debug server is started by default.
 
-Keep the runtime independent of rendering and React. The editor is an authoring tool, not a game bundle dependency. Build runtime inspection, reusable graph serialization and production performance validation incrementally. Prioritize safe cancellation, reproducible tests and small mobile runtime overhead.
+## Security and maturity
+
+`@instinct/bridge` is a **local development tool**; never expose its WebSocket relay to the public internet. Debug traces can disclose Blackboard values. Dependencies still require security review (issue #6). Manual browser testing, build reproducibility and mobile performance gates remain outstanding.
 
 ## License
 
 MIT.
 
-Read [Runtime Debugging Guide](docs/debugging.md), [Visual Editor Guide](docs/editor.md), [HSM guide](docs/state-machines.md), [Blackboard guide](docs/blackboards.md), and [Three.js guide](docs/three.md).
+See [Visual Editor](docs/editor.md), [Runtime Debugger](docs/debugging.md), [Bridge](docs/bridge.md), [HSM](docs/state-machines.md), [Blackboard](docs/blackboards.md) and [Three.js](docs/three.md) guides.

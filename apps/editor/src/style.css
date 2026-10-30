@@ -23,3 +23,8 @@
 .debug-status.failure{color:#ec9292}
 .debug-status.aborted{color:#efc783}
 .debugger-pane .eyebrow:not(:first-child){margin-top:16px}
+
+/* Read-only local relay controls */
+.right-pane input.debug-token,.right-pane select.debug-token{width:100%;padding:9px;color:#eff6ff;background:#0b1928;border:1px solid #4b6377;border-radius:7px;font-size:12px}
+.right-pane input.debug-token:focus,.right-pane select.debug-token:focus{outline:1px solid #b0d6a1}
+.right-pane .section>p[role=status]{margin-top:9px;overflow-wrap:anywhere}

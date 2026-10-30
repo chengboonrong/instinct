@@ -9,6 +9,7 @@ import './style.css';
 import {Agent} from '@instinct/core';
 import {BlackboardStore} from '@instinct/blackboard';
 import {TraceRecorder, type TraceSnapshot} from '@instinct/devtools';
+import {DevtoolsViewer, type AgentInfo, type RemoteFrame} from '@instinct/bridge';
 import {
   compileGraph, parseGraph, sampleGraph, serializeGraph, validateGraph,
   NODE_KINDS, type BehaviorGraph, type BehaviorKind, type TreeNode, type BehaviorRegistry,
@@ -59,28 +60,105 @@ function App() {
   const [previewEvents, setPreviewEvents] = useState<string[]>([]);
   const [trace, setTrace] = useState<TraceSnapshot | null>(null);
   const [autoPlaying, setAutoPlaying] = useState(false);
+  const [bridgeToken, setBridgeToken] = useState('');
+  const [bridgeStatus, setBridgeStatus] = useState('Not connected');
+  const [remoteAgents, setRemoteAgents] = useState<readonly AgentInfo[]>([]);
+  const [remoteAgentId, setRemoteAgentId] = useState('');
+  const [remoteFrame, setRemoteFrame] = useState<RemoteFrame | null>(null);
+  const viewer = useRef<DevtoolsViewer | null>(null);
+  const selectedRemote = useRef('');
+  useEffect(() => () => {viewer.current?.close();}, []);
+  const connectBridge = () => {
+    viewer.current?.close();
+    setRemoteFrame(null);
+    setRemoteAgents([]);
+    try {
+      const connection = new DevtoolsViewer({
+        token: bridgeToken,
+        onEvent(event) {
+          switch (event.type) {
+            case 'connected': setBridgeStatus('Connected to local bridge'); break;
+            case 'disconnected':
+              setBridgeStatus('Disconnected');
+              setRemoteFrame(null);
+              setRemoteAgents([]);
+              break;
+            case 'error': setBridgeStatus('Error: ' + event.message); break;
+            case 'roster':
+              setRemoteAgents(event.agents);
+              if (!event.agents.some(agent => agent.id === selectedRemote.current)) {
+                selectedRemote.current = '';
+                setRemoteAgentId('');
+                setRemoteFrame(null);
+              }
+              break;
+            case 'frame':
+              if (event.frame.id === selectedRemote.current) {
+                setRemoteFrame(event.frame);
+                setSelectedId(previous => event.frame.graph.nodes.some(node => node.id === previous)
+                  ? previous : event.frame.graph.rootId);
+              }
+              break;
+          }
+        },
+      });
+      viewer.current = connection;
+      setBridgeStatus('Connecting to 127.0.0.1:7331…');
+      connection.connect();
+    } catch (error) {
+      setBridgeStatus(error instanceof Error ? error.message : 'Unable to connect');
+    }
+  };
+  const disconnectBridge = () => {
+    viewer.current?.close();
+    viewer.current = null;
+    selectedRemote.current = '';
+    setRemoteAgentId('');
+    setRemoteFrame(null);
+    setRemoteAgents([]);
+    setBridgeStatus('Not connected');
+  };
+  const selectRemoteAgent = (id: string) => {
+    if (!id) {
+      selectedRemote.current = '';
+      setRemoteAgentId('');
+      setRemoteFrame(null);
+      return;
+    }
+    setAutoPlaying(false);
+    selectedRemote.current = id;
+    setRemoteAgentId(id);
+    setRemoteFrame(null);
+    viewer.current?.select(id);
+  };
+
   const nonce = useRef(0);
   const running = useRef<{graph: BehaviorGraph; agent: Agent<MemoryStore>; memory: MemoryStore; recorder: TraceRecorder} | null>(null);
-  const validation = useMemo(() => validateGraph(graph), [graph]);
-  const selected = graph.nodes.find(node => node.id === selectedId);
-  const nodes = useMemo<FlowNode[]>(() => graph.nodes.map(n => ({
+  const visibleGraph = remoteFrame?.graph ?? graph;
+  const visibleTrace = remoteFrame?.trace ?? trace;
+  const inRemoteMode = remoteFrame !== null;
+  const validation = useMemo(() => validateGraph(visibleGraph), [visibleGraph]);
+  const selected = visibleGraph.nodes.find(node => node.id === selectedId);
+  const nodes = useMemo<FlowNode[]>(() => visibleGraph.nodes.map(n => ({
     id: n.id, type: 'behavior', position: n.position,
-    data: {kind: n.kind, label: n.label, ...(n.task ? {task: n.task} : {}), root: n.id === graph.rootId, ...(trace?.nodeStatuses[n.id] ? {debugStatus: trace.nodeStatuses[n.id]} : {})},
+    data: {kind: n.kind, label: n.label, ...(n.task ? {task: n.task} : {}), root: n.id === graph.rootId, ...(visibleTrace?.nodeStatuses[n.id] ? {debugStatus: visibleTrace.nodeStatuses[n.id]} : {})},
     selected: n.id === selectedId,
-  })), [graph, selectedId, trace]);
-  const edges = useMemo<Edge[]>(() => graph.nodes.flatMap(n => n.children.map((childId, index) => ({
+  })), [visibleGraph, selectedId, visibleTrace]);
+  const edges = useMemo<Edge[]>(() => visibleGraph.nodes.flatMap(n => n.children.map((childId, index) => ({
     id: n.id + ':' + childId, source: n.id, target: childId,
     label: String(index + 1), type: 'smoothstep', animated: false,
     style: {stroke: '#89a4bd', strokeWidth: 1.8},
     labelStyle: {fill: '#d6e6f2', fontWeight: 700},
     labelBgStyle: {fill: '#24394a'},
-  }))), [graph]);
+  }))), [visibleGraph]);
 
   const changeNode = useCallback((id: string, mutate: (node: TreeNode) => TreeNode) => {
+    if (inRemoteMode) return;
     setGraph(current => ({...current, nodes: current.nodes.map(node => node.id === id ? mutate(node) : node)}));
-  }, []);
+  }, [inRemoteMode]);
 
   const onNodesChange = useCallback((changes: NodeChange<FlowNode>[]) => {
+    if (inRemoteMode) return;
     const positions = new Map<string, {x: number; y: number}>();
     const removed = new Set<string>();
     for (const change of changes) {
@@ -97,20 +175,22 @@ function App() {
       }))};
     });
     if (removed.has(selectedId ?? '')) setSelectedId(null);
-  }, [selectedId]);
+  }, [selectedId, inRemoteMode]);
 
   const removeEdge = useCallback((source: string, target: string) => {
     changeNode(source, n => ({...n, children: n.children.filter(id => id !== target)}));
   }, [changeNode]);
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    if (inRemoteMode) return;
     for (const change of changes) {
       if (change.type !== 'remove') continue;
       const edge = edges.find(edge => edge.id === change.id);
       if (edge) removeEdge(edge.source, edge.target);
     }
-  }, [edges, removeEdge]);
+  }, [edges, removeEdge, inRemoteMode]);
 
   const onConnect = useCallback((connection: Connection) => {
+    if (inRemoteMode) return;
     const {source, target} = connection;
     if (!source || !target || source === target) {setNotice('Cannot connect a node to itself.'); return;}
     const parent = graph.nodes.find(n => n.id === source);
@@ -129,9 +209,10 @@ function App() {
     if (reachable(target, source)) {setNotice('Cycles are not allowed in behavior trees.'); return;}
     changeNode(source, n => ({...n, children: [...n.children, target]}));
     setNotice('Connected. Child priority follows its order in the parent inspector.');
-  }, [graph, changeNode]);
+  }, [graph, changeNode, inRemoteMode]);
 
   const addNode = () => {
+    if (inRemoteMode) return;
     const id = newKind + '-' + (++nonce.current).toString(36) + '-' + Date.now().toString(36);
     const pos = selected?.position ?? {x: 100, y: 100};
     const node: TreeNode = {
@@ -146,6 +227,7 @@ function App() {
   };
 
   const deleteSelected = () => {
+    if (inRemoteMode) return;
     if (!selected || selected.id === graph.rootId) return;
     setGraph(current => ({
       ...current,
@@ -157,6 +239,7 @@ function App() {
   };
 
   const reorder = (childIndex: number, direction: number) => {
+    if (inRemoteMode) return;
     if (!selected) return;
     const other = childIndex + direction;
     if (other < 0 || other >= selected.children.length) return;
@@ -178,6 +261,7 @@ function App() {
     } catch (error) {setNotice(error instanceof Error ? error.message : 'Export failed');}
   };
   const importGraph = () => {
+    if (inRemoteMode) return;
     try {
       const value = parseGraph(jsonText);
       setGraph(value);
@@ -187,6 +271,7 @@ function App() {
     } catch (error) {setNotice(error instanceof Error ? error.message : 'Import failed');}
   };
   const stepPreview = useCallback(() => {
+    if (inRemoteMode) return;
     try {
       if (!running.current || running.current.graph !== graph) {
         running.current?.agent.stop();
@@ -212,7 +297,7 @@ function App() {
       setPreviewStatus('Error');
       setNotice(error instanceof Error ? error.message : 'Preview failed');
     }
-  }, [graph, health, hasTarget]);
+  }, [graph, health, hasTarget, inRemoteMode]);
   const resetPreview = () => {
     running.current?.agent.stop();
     running.current?.recorder.dispose();
@@ -235,7 +320,7 @@ function App() {
         <div className="brand"><span className="brand-icon">◈</span><div><strong>instinct<span className="accent">.</span></strong><small>BEHAVIOR STUDIO / ALPHA</small></div></div>
         <div className="top-actions">
           <span className={validation.valid ? 'status good' : 'status bad'}>{validation.valid ? '✓ Valid tree' : validation.issues.length + ' issues'}</span>
-          <button onClick={() => {setGraph(sampleGraph()); setSelectedId('root'); resetPreview();}}>Reset sample</button>
+          <button disabled={inRemoteMode} onClick={() => {setGraph(sampleGraph()); setSelectedId('root'); resetPreview();}}>Reset sample</button>
           <button className="primary" onClick={() => void exportGraph()}>Export JSON</button>
         </div>
       </header>
@@ -243,39 +328,40 @@ function App() {
         <aside className="sidebar">
           <div className="section"><span className="eyebrow">NODE LIBRARY</span><h2>Compose behavior</h2><p>Connect actions and conditions to build a runnable decision tree.</p>
             <label className="control-label" htmlFor="newKind">New node type</label>
-            <select id="newKind" value={newKind} onChange={e => setNewKind(e.target.value as BehaviorKind)}>
+            <select id="newKind" disabled={inRemoteMode} value={newKind} onChange={e => setNewKind(e.target.value as BehaviorKind)}>
               {NODE_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
             </select>
-            <button className="wide" onClick={addNode}>+ Add node to canvas</button>
+            <button className="wide" disabled={inRemoteMode} onClick={addNode}>+ Add node to canvas</button>
           </div>
           <div className="section">
             <span className="eyebrow">INSPECTOR</span>
             {selected ? <div className="inspector">
               <h2>{selected.label}</h2><div className="muted tiny">{selected.id === graph.rootId ? 'Root node' : selected.id}</div>
               <label className="control-label" htmlFor="nodeLabel">Display label</label>
-              <input id="nodeLabel" value={selected.label} maxLength={80} onChange={e => changeNode(selected.id, n => ({...n, label: e.target.value}))}/>
+              <input id="nodeLabel" disabled={inRemoteMode} value={selected.label} maxLength={80} onChange={e => changeNode(selected.id, n => ({...n, label: e.target.value}))}/>
               {leaf(selected.kind) && <><label className="control-label" htmlFor="taskKey">Task registry key</label>
-                <input id="taskKey" list="taskOptions" value={selected.task ?? ''} onChange={e => changeNode(selected.id, n => ({...n, task: e.target.value}))}/>
+                <input id="taskKey" list="taskOptions" disabled={inRemoteMode} value={selected.task ?? ''} onChange={e => changeNode(selected.id, n => ({...n, task: e.target.value}))}/>
                 <datalist id="taskOptions">{availableTasks(selected.kind).map(t => <option key={t} value={t}/>)}</datalist>
               </>}
               {!leaf(selected.kind) && <><div className="control-label">Child priority · first wins</div>
                 {selected.children.length ? selected.children.map((id, index) => (
                   <div className="child-item" key={id}><span>{index + 1}. {graph.nodes.find(n => n.id === id)?.label ?? id}</span>
-                  <button title="Move up" disabled={index === 0} onClick={() => reorder(index, -1)}>↑</button>
-                  <button title="Move down" disabled={index === selected.children.length - 1} onClick={() => reorder(index, +1)}>↓</button></div>
+                  <button title="Move up" disabled={inRemoteMode || index === 0} onClick={() => reorder(index, -1)}>↑</button>
+                  <button title="Move down" disabled={inRemoteMode || index === selected.children.length - 1} onClick={() => reorder(index, +1)}>↓</button></div>
                 )) : <p className="muted tiny">Connect a child using the right-side handle.</p>}
               </>}
-              {selected.id !== graph.rootId && <button className="danger wide" onClick={deleteSelected}>Delete selected node</button>}
+              {selected.id !== graph.rootId && <button className="danger wide" disabled={inRemoteMode} onClick={deleteSelected}>Delete selected node</button>}
             </div> : <p>Click a node to inspect its settings.</p>}
           </div>
         </aside>
         <main className="canvas">
-          <div className="canvas-title"><div><span className="eyebrow">VISUAL AUTHORING</span><h1>Enemy decision tree</h1></div><span className="muted">Drag nodes · Connect handles · Set priority</span></div>
+          <div className="canvas-title"><div><span className="eyebrow">{inRemoteMode ? 'READ-ONLY / LIVE GAME' : 'VISUAL AUTHORING'}</span><h1>{inRemoteMode ? remoteFrame.label : 'Enemy decision tree'}</h1></div><span className="muted">{inRemoteMode ? 'Remote agent · cannot modify game state' : 'Drag nodes · Connect handles · Set priority'}</span></div>
           <ReactFlow<FlowNode>
             nodes={nodes} edges={edges} nodeTypes={nodeTypes}
             onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
             onNodeClick={(_, node) => setSelectedId(node.id)}
             onPaneClick={() => setSelectedId(null)}
+            nodesDraggable={!inRemoteMode} nodesConnectable={!inRemoteMode} elementsSelectable
             fitView fitViewOptions={{padding: 0.15}} minZoom={0.25} maxZoom={1.5}
             deleteKeyCode={['Backspace', 'Delete']} edgesReconnectable={false}
           >
@@ -285,29 +371,48 @@ function App() {
           </ReactFlow>
         </main>
         <aside className="right-pane">
+          <div className="section">
+            <span className="eyebrow">GAME DEBUG BRIDGE · LOOPBACK</span>
+            <h2>Live game agents</h2>
+            <p className="muted tiny">Run the local relay; enter its token here and in the Three.js example. Read-only connection, no game commands.</p>
+            <label className="control-label" htmlFor="debugToken">Session token (not saved)</label>
+            <input id="debugToken" className="debug-token" type="password" autoComplete="off"
+              value={bridgeToken} onChange={event => setBridgeToken(event.target.value)} placeholder="Paste local relay token"/>
+            <div className="split">
+              <button className="primary" onClick={connectBridge}>Connect</button>
+              <button onClick={disconnectBridge}>Disconnect</button>
+            </div>
+            <p className="muted tiny" role="status">{bridgeStatus}</p>
+            <label className="control-label" htmlFor="remoteAgent">Agent to inspect</label>
+            <select id="remoteAgent" className="debug-token" value={remoteAgentId}
+              onChange={event => selectRemoteAgent(event.target.value)}>
+              <option value="">Local sandbox / no remote agent</option>
+              {remoteAgents.map(agent => <option key={agent.id} value={agent.id}>{agent.label} ({agent.id})</option>)}
+            </select>
+          </div>
           <div className="section"><span className="eyebrow">SANDBOX</span><h2>Test behavior</h2>
             <label className="control-label" htmlFor="health">Health · {health}</label>
-            <input id="health" type="range" min={0} max={100} value={health} onChange={e => setHealth(Number(e.target.value))}/>
-            <label className="check-row"><input type="checkbox" checked={hasTarget} onChange={e => setHasTarget(e.target.checked)}/> Target detected</label>
-            <div className="preview-output"><span className="eyebrow">LAST RESULT</span><strong>{previewStatus}</strong>{previewEvents.map((event, i) => <p key={i}>{event}</p>)}</div>
-            <div className="split"><button className="primary" onClick={stepPreview}>▶ Step</button><button onClick={() => setAutoPlaying(active => !active)}>{autoPlaying ? '⏸ Pause' : '▶ Play'}</button><button onClick={resetPreview}>Reset</button></div>
+            <input id="health" disabled={inRemoteMode} type="range" min={0} max={100} value={health} onChange={e => setHealth(Number(e.target.value))}/>
+            <label className="check-row"><input type="checkbox" disabled={inRemoteMode} checked={hasTarget} onChange={e => setHasTarget(e.target.checked)}/> Target detected</label>
+            <div className="preview-output"><span className="eyebrow">LAST RESULT</span><strong>{inRemoteMode ? 'LIVE' : previewStatus}</strong>{previewEvents.map((event, i) => <p key={i}>{event}</p>)}</div>
+            <div className="split"><button className="primary" disabled={inRemoteMode} onClick={stepPreview}>▶ Step</button><button disabled={inRemoteMode} onClick={() => setAutoPlaying(active => !active)}>{autoPlaying ? '⏸ Pause' : '▶ Play'}</button><button disabled={inRemoteMode} onClick={resetPreview}>Reset</button></div>
             <p className="muted tiny">Play advances one 50ms AI tick every 200ms of wall time. Pause freezes the simulation; Step advances exactly once.</p>
           </div>
           <div className="section debugger-pane">
             <span className="eyebrow">LIVE DEBUGGER · LOCAL PREVIEW</span>
             <h2>Node execution</h2>
-            <p className="muted tiny">Most recent tick: {trace?.tick ?? 0}. Active nodes glow green; failed nodes red; canceled nodes amber.</p>
+            <p className="muted tiny">Most recent tick: {visibleTrace?.tick ?? 0}. Active nodes glow green; failed nodes red; canceled nodes amber.</p>
             <div className="debug-metrics">
-              <span>{trace?.nodeStatuses ? Object.values(trace.nodeStatuses).filter(v => v === 'running').length : 0} running</span>
-              <span>{trace?.entries.length ?? 0} events retained</span>
+              <span>{visibleTrace?.nodeStatuses ? Object.values(visibleTrace.nodeStatuses).filter(v => v === 'running').length : 0} running</span>
+              <span>{visibleTrace?.entries.length ?? 0} events retained</span>
             </div>
             <span className="eyebrow">BLACKBOARD SNAPSHOT</span>
-            <div className="debug-memory">{trace ? Object.entries(trace.blackboard).map(([key, value]) => (
+            <div className="debug-memory">{visibleTrace ? Object.entries(visibleTrace.blackboard).map(([key, value]) => (
               <div key={key}><code>{key}</code><span>{value}</span></div>
             )) : <p className="muted tiny">Run a tick to inspect memory.</p>}</div>
             <span className="eyebrow">RECENT EVENTS</span>
             <div className="debug-history" aria-label="Execution trace">
-              {trace?.entries.slice(-12).reverse().map(event => (
+              {visibleTrace?.entries.slice(-12).reverse().map(event => (
                 <div key={event.sequence} className="debug-entry"><span className="debug-seq">#{event.sequence}</span>
                   {event.kind === 'node' ? <><strong>{event.nodeId}</strong><span className={'debug-status ' + event.status}>{event.status}</span></> :
                     <><strong>{event.key}</strong><span>{event.previous} → {event.current}</span></>}
@@ -321,8 +426,8 @@ function App() {
           </div>
           <div className="section json-panel"><span className="eyebrow">PORTABLE GRAPH / V1</span>
             <p className="muted tiny">Export a valid tree, edit the JSON, then import it. Invalid data is rejected.</p>
-            <textarea aria-label="Graph JSON" spellCheck={false} value={jsonText} onChange={e => setJsonText(e.target.value)} placeholder="JSON appears here after export…"/>
-            <button className="wide" onClick={importGraph}>Import & validate JSON</button>
+            <textarea disabled={inRemoteMode} aria-label="Graph JSON" spellCheck={false} value={jsonText} onChange={e => setJsonText(e.target.value)} placeholder="JSON appears here after export…"/>
+            <button className="wide" disabled={inRemoteMode} onClick={importGraph}>Import & validate JSON</button>
           </div>
         </aside>
       </div>

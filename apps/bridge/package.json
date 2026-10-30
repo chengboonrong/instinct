@@ -1,0 +1,17 @@
+{
+  "name": "@instinct/bridge-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Loopback-only development WebSocket relay",
+  "scripts": {
+    "dev": "node server.mjs"
+  },
+  "dependencies": {
+    "@instinct/bridge": "0.1.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.0"
+  }
+}
