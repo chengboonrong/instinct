@@ -95,6 +95,19 @@ test('invalid token cannot list NPCs; reconnect works with correct token', async
   }
 });
 
+test('a node id naming an Object.prototype member cannot blank Studio', async ({page}) => {
+  await page.goto(STUDIO);
+  const leaf = (id: string, task: string) => ({id, kind: 'action', label: id, task, children: [], position: {x: 300, y: 0}});
+  await page.getByLabel('Graph JSON').fill(JSON.stringify({version: 1, rootId: 'top', nodes: [
+    {id: 'top', kind: 'selector', label: 'top', children: ['patrol', '__proto__'], position: {x: 0, y: 0}},
+    leaf('patrol', 'patrol'), leaf('__proto__', 'attack'),
+  ]}));
+  await page.getByRole('button', {name: 'Import & validate JSON'}).click();
+  await page.getByRole('button', {name: /Step/}).click();
+  await expect(page.locator('.preview-output')).toContainText('running');
+  await expect(page.locator('.tree-node.trace-running').first()).toBeVisible();
+});
+
 test('local authoring preview still runs when no remote agent is selected', async ({page}) => {
   await page.goto(STUDIO);
   await expect(page.locator('main h1')).toHaveText('Enemy decision tree');

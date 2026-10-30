@@ -70,6 +70,8 @@ function App() {
   useEffect(() => () => {viewer.current?.close();}, []);
   const connectBridge = () => {
     viewer.current?.close();
+    selectedRemote.current = '';
+    setRemoteAgentId('');
     setRemoteFrame(null);
     setRemoteAgents([]);
     try {
@@ -80,6 +82,8 @@ function App() {
             case 'connected': setBridgeStatus('Connected to local bridge'); break;
             case 'disconnected':
               setBridgeStatus('Disconnected');
+              selectedRemote.current = '';
+              setRemoteAgentId('');
               setRemoteFrame(null);
               setRemoteAgents([]);
               break;
@@ -141,7 +145,7 @@ function App() {
   const selected = visibleGraph.nodes.find(node => node.id === selectedId);
   const nodes = useMemo<FlowNode[]>(() => visibleGraph.nodes.map(n => ({
     id: n.id, type: 'behavior', position: n.position,
-    data: {kind: n.kind, label: n.label, ...(n.task ? {task: n.task} : {}), root: n.id === graph.rootId, ...(visibleTrace?.nodeStatuses[n.id] ? {debugStatus: visibleTrace.nodeStatuses[n.id]} : {})},
+    data: {kind: n.kind, label: n.label, ...(n.task ? {task: n.task} : {}), root: n.id === graph.rootId, ...(visibleTrace && Object.hasOwn(visibleTrace.nodeStatuses, n.id) ? {debugStatus: visibleTrace.nodeStatuses[n.id]} : {})},
     selected: n.id === selectedId,
   })), [visibleGraph, selectedId, visibleTrace]);
   const edges = useMemo<Edge[]>(() => visibleGraph.nodes.flatMap(n => n.children.map((childId, index) => ({

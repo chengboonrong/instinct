@@ -14,6 +14,14 @@ describe('development bridge protocol', () => {
     expect(validateRemoteFrame({...frame(), graph: {version: 1, rootId: 'bad', nodes: []}})).toBe(false);
     expect(validateRemoteFrame({...frame(), trace: {...frame().trace, entries: new Array(257).fill({})}})).toBe(false);
   });
+  it('rejects hostile field types without throwing or coercing', () => {
+    const hostile = {toString: null, valueOf: null};
+    const withStatus = (status: unknown) => ({...frame(), trace: {...frame().trace, nodeStatuses: {root: status}}});
+    expect(validateRemoteFrame(withStatus(hostile))).toBe(false);
+    expect(validateRemoteFrame(withStatus([['running']]))).toBe(false);
+    const graph = sampleGraph();
+    expect(validateRemoteFrame({...frame(), graph: {...graph, nodes: [{...graph.nodes[0], kind: hostile}]}})).toBe(false);
+  });
   it('rejects nonlocal transports, short tokens and embedded credentials', () => {
     const token = '1234567890123456';
     expect(() => new DevtoolsViewer({token, url: 'wss://production.example/ws'})).toThrow('local');
